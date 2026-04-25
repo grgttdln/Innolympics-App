@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
-const EMBED_MODEL = "text-embedding-004";
+// text-embedding-004 has been deprecated from v1beta embedContent; use
+// gemini-embedding-001 with outputDimensionality=768 to match the schema.
+const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIM = 768;
 
 let client: GoogleGenAI | null = null;

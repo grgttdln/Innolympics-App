@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { HeartHandshake, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, HeartHandshake, Plus, Sparkles } from "lucide-react";
+
+import type { Intent } from "@/lib/types";
 
 type FollowUpCardProps = {
   question: string;
@@ -88,6 +90,71 @@ export function SupportCard() {
       >
         Leave and return later
       </Link>
+    </div>
+  );
+}
+
+type AiResponseCardProps = {
+  intent: Intent;
+  response: string;
+  escalation?: boolean;
+};
+
+export function AiResponseCard({
+  intent,
+  response,
+  escalation,
+}: AiResponseCardProps) {
+  const isCrisis = intent === "crisis";
+  return (
+    <div
+      className={[
+        "flex flex-col gap-2.5 rounded-[20px] border p-4",
+        isCrisis
+          ? "border-[#F3D6D0] bg-[#FBEDE9]"
+          : "border-[#D7E4DC] bg-[#EFF6F1]",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-1.5">
+        <span
+          aria-hidden
+          className={[
+            "flex h-[22px] w-[22px] items-center justify-center rounded-full",
+            isCrisis ? "bg-[#C06B5D]" : "bg-[#4F8A6E]",
+          ].join(" ")}
+        >
+          {isCrisis ? (
+            <HeartHandshake className="h-3 w-3 text-white" strokeWidth={2} />
+          ) : (
+            <Sparkles className="h-3 w-3 text-white" strokeWidth={2} />
+          )}
+        </span>
+        <span
+          className={[
+            "text-[11px] font-bold uppercase tracking-[1px]",
+            isCrisis ? "text-[#8A3A2E]" : "text-[#2F5C47]",
+          ].join(" ")}
+        >
+          {isCrisis ? "Support" : "AI Companion"}
+        </span>
+      </div>
+
+      <p className="whitespace-pre-wrap text-[14px] leading-[1.55] text-[#1A1A1A]">
+        {response}
+      </p>
+
+      {escalation && !isCrisis ? (
+        <div className="flex items-start gap-1.5 rounded-[12px] bg-white/60 px-3 py-2 text-[12px] text-[#6B4A43]">
+          <AlertTriangle
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C06B5D]"
+            strokeWidth={2}
+          />
+          <span>
+            Your mood has trended down across recent entries. If this pattern
+            continues, consider talking to someone you trust.
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
