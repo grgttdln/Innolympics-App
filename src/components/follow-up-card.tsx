@@ -165,37 +165,6 @@ export function AiResponseCard({
   );
 }
 
-type MoodChipProps = {
-  moodScore: number;
-  emotions: string[];
-};
-
-export function MoodChip({ moodScore, emotions }: MoodChipProps) {
-  const label =
-    moodScore > 0.3 ? "positive" : moodScore < -0.3 ? "heavy" : "neutral";
-  const tone =
-    moodScore > 0.3
-      ? "bg-[#EFF6F1] text-[#2F5C47]"
-      : moodScore < -0.3
-        ? "bg-[#FBEDE9] text-[#8A3A2E]"
-        : "bg-[#F2EEE9] text-[#6B6259]";
-  const emotionText = emotions.length ? ` · ${emotions.join(", ")}` : "";
-  return (
-    <div
-      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.6px] ${tone}`}
-    >
-      <span>{label}</span>
-      <span aria-hidden className="opacity-50">
-        ·
-      </span>
-      <span className="normal-case tracking-normal">
-        mood {moodScore.toFixed(2)}
-        {emotionText}
-      </span>
-    </div>
-  );
-}
-
 type ProfessionalHelpCardProps = {
   onConnect?: () => void;
 };

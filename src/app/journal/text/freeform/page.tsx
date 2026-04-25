@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
@@ -51,6 +52,7 @@ export default function FreeformWritingPage() {
   const caretRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setMeta(formatDate(new Date()));
@@ -259,16 +261,6 @@ export default function FreeformWritingPage() {
             );
           })}
 
-          {aiReply ? (
-            <button
-              type="button"
-              onClick={() => setInsightsOpen(true)}
-              className="self-start rounded-full border border-[#E9DAF2] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#5B3D78] transition-opacity hover:opacity-80 active:opacity-70"
-            >
-              View reflective insights
-            </button>
-          ) : null}
-
           {submitError ? (
             <p className="text-[13px] text-[#8A3A2E]">{submitError}</p>
           ) : null}
@@ -278,7 +270,15 @@ export default function FreeformWritingPage() {
 
         <InsightsDialog
           open={insightsOpen}
-          onOpenChange={setInsightsOpen}
+          onOpenChange={(next) => {
+            setInsightsOpen(next);
+            if (!next && aiReply) {
+              // After the user reads their insights and dismisses the
+              // dialog, take them back to the dashboard. `replace` so
+              // Back doesn't return to a stale freeform draft.
+              router.replace("/dashboard");
+            }
+          }}
           reply={aiReply}
           container={frameRef}
         />
