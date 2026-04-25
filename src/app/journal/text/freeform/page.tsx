@@ -4,13 +4,19 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
-import { FollowUpCard } from "@/components/follow-up-card";
+import { FollowUpCard, SupportCard } from "@/components/follow-up-card";
+import { loadUser } from "@/lib/session";
 
 const IDLE_MS = 3000;
-const DISMISS_COOLDOWN_MS = 15000;
-const MOCK_QUESTION = "What was it about the light that caught your attention?";
+const COOLDOWN_MS = 15000;
 
 type Block = { kind: "text"; value: string } | { kind: "question"; value: string };
+
+type SuggestPayload =
+  | { question: string }
+  | { skip: true }
+  | { blocked: true }
+  | { error: string };
 
 function formatDate(date: Date) {
   const day = date.toLocaleDateString("en-US", {
@@ -26,50 +32,72 @@ function formatDate(date: Date) {
   return { day, time };
 }
 
-function autosize(el: HTMLTextAreaElement | null) {
-  if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-}
-
 export default function FreeformWritingPage() {
   const [title, setTitle] = useState("Untitled entry");
   const [blocks, setBlocks] = useState<Block[]>([{ kind: "text", value: "" }]);
   const [split, setSplit] = useState<{ pre: string; post: string } | null>(null);
   const [question, setQuestion] = useState<string | null>(null);
   const [suppressUntil, setSuppressUntil] = useState(0);
+  const [locked, setLocked] = useState(false);
   const [meta, setMeta] = useState<{ day: string; time: string } | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+
   const caretRef = useRef(0);
-  const preRef = useRef<HTMLTextAreaElement>(null);
-  const postRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setMeta(formatDate(new Date()));
+    setUserId(loadUser()?.id ?? null);
   }, []);
 
   useEffect(() => {
-    autosize(preRef.current);
-    autosize(postRef.current);
-  }, [split]);
-
-  useEffect(() => {
-    if (question) return;
+    if (locked || question || userId === null) return;
     const combined = blocks.map((b) => b.value).join("");
     if (!combined.trim()) return;
 
     const wait = Math.max(IDLE_MS, suppressUntil - Date.now());
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const lastIdx = blocks.length - 1;
       const last = blocks[lastIdx];
       if (last.kind !== "text") return;
-      const caret = Math.min(caretRef.current, last.value.length);
-      setSplit({ pre: last.value.slice(0, caret), post: last.value.slice(caret) });
-      setQuestion(MOCK_QUESTION);
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const res = await fetch("/api/journal/suggest", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(userId),
+          },
+          body: JSON.stringify({ blocks }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as SuggestPayload;
+
+        if ("blocked" in data && data.blocked) {
+          setLocked(true);
+          return;
+        }
+        if ("question" in data && typeof data.question === "string") {
+          const caret = Math.min(caretRef.current, last.value.length);
+          setSplit({ pre: last.value.slice(0, caret), post: last.value.slice(caret) });
+          setQuestion(data.question);
+        }
+      } catch {
+        // aborted or network error — silent
+      }
     }, wait);
 
-    return () => clearTimeout(timer);
-  }, [blocks, question, suppressUntil]);
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
+  }, [blocks, question, suppressUntil, locked, userId]);
 
   const updateBlock = (idx: number, value: string) => {
     setBlocks((bs) => bs.map((b, i) => (i === idx && b.kind === "text" ? { ...b, value } : b)));
@@ -87,6 +115,7 @@ export default function FreeformWritingPage() {
     });
     setSplit(null);
     setQuestion(null);
+    setSuppressUntil(Date.now() + COOLDOWN_MS);
   };
 
   const handleDismiss = () => {
@@ -100,7 +129,7 @@ export default function FreeformWritingPage() {
     }
     setSplit(null);
     setQuestion(null);
-    setSuppressUntil(Date.now() + DISMISS_COOLDOWN_MS);
+    setSuppressUntil(Date.now() + COOLDOWN_MS);
   };
 
   const hasContent = blocks.some((b) => b.value.trim().length > 0);
@@ -111,17 +140,7 @@ export default function FreeformWritingPage() {
       <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#FCFAF7] sm:h-[844px] sm:w-[390px] sm:rounded-[40px]">
         <div className="hidden h-[54px] shrink-0 sm:block" aria-hidden />
 
-        <div className="flex items-center px-5 pb-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pt-3">
-          <Link
-            href="/journal/text"
-            aria-label="Close"
-            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#E9DAF2] bg-white text-[#1A1A1A] transition-opacity hover:opacity-90 active:opacity-80"
-          >
-            <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
-          </Link>
-        </div>
-
-        <header className="flex flex-col gap-1.5 px-6 pb-2 pt-4">
+        <header className="flex flex-col gap-1.5 px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2.5rem)] sm:pt-10">
           {meta ? (
             <div className="flex items-center gap-2 text-[13px] font-semibold tracking-[0.4px] text-[#B8B0A7]">
               <span>{meta.day}</span>
@@ -136,13 +155,14 @@ export default function FreeformWritingPage() {
             onFocus={(e) => {
               if (e.target.value === "Untitled entry") e.target.select();
             }}
+            readOnly={locked}
             aria-label="Entry title"
             className="w-full border-none bg-transparent p-0 text-[30px] font-bold leading-[1.1] tracking-[-1px] text-[#1A1A1A] placeholder:text-[#B8B0A7] focus:outline-none"
             placeholder="Untitled entry"
           />
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-2 [scrollbar-color:#D9D2C7_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D9D2C7] [&::-webkit-scrollbar]:w-1.5">
           {blocks.map((block, i) => {
             if (block.kind === "question") {
               return (
@@ -160,13 +180,13 @@ export default function FreeformWritingPage() {
               return (
                 <Fragment key={i}>
                   <EntryArea
-                    ref={preRef}
                     value={split.pre}
                     onChange={(v) => setSplit((s) => (s ? { ...s, pre: v } : s))}
                     onCaret={(c) => {
                       caretRef.current = c;
                     }}
                     placeholder=""
+                    readOnly={locked}
                   />
                   <FollowUpCard
                     question={question ?? ""}
@@ -174,10 +194,10 @@ export default function FreeformWritingPage() {
                     onDismiss={handleDismiss}
                   />
                   <EntryArea
-                    ref={postRef}
                     value={split.post}
                     onChange={(v) => setSplit((s) => (s ? { ...s, post: v } : s))}
                     placeholder="Keep writing. This space is yours."
+                    readOnly={locked}
                   />
                 </Fragment>
               );
@@ -189,10 +209,13 @@ export default function FreeformWritingPage() {
                 value={block.value}
                 onChange={(v) => updateBlock(i, v)}
                 onCaret={isLast ? (c) => (caretRef.current = c) : undefined}
-                placeholder={isLast ? "Keep writing. This space is yours." : ""}
+                placeholder={isLast && !locked ? "Keep writing. This space is yours." : ""}
+                readOnly={locked}
               />
             );
           })}
+
+          {locked ? <SupportCard /> : null}
         </div>
 
         <div className="shrink-0 border-t border-[#EFE8E0] bg-[#FCFAF7] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
@@ -206,7 +229,7 @@ export default function FreeformWritingPage() {
             </Link>
             <button
               type="button"
-              disabled={!hasContent}
+              disabled={!hasContent || locked}
               className="flex h-[52px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[26px] bg-[#1A1A1A] text-[15px] font-semibold tracking-[0.1px] text-[#FCFAF7] shadow-[0_6px_20px_rgba(26,26,26,0.2)] transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Submit
@@ -225,40 +248,33 @@ type EntryAreaProps = {
   onChange: (value: string) => void;
   onCaret?: (caret: number) => void;
   placeholder: string;
+  readOnly?: boolean;
 };
 
-const EntryArea = function EntryArea({
-  ref,
-  value,
-  onChange,
-  onCaret,
-  placeholder,
-}: EntryAreaProps & { ref?: React.Ref<HTMLTextAreaElement> }) {
-  const innerRef = useRef<HTMLTextAreaElement>(null);
+const ENTRY_CLASS =
+  "m-0 block w-full whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] leading-[1.55] text-[#1A1A1A] placeholder:italic placeholder:text-[#B8B0A7] focus:outline-none";
 
-  useEffect(() => {
-    autosize(innerRef.current);
-  }, [value]);
-
-  const setRef = (el: HTMLTextAreaElement | null) => {
-    innerRef.current = el;
-    if (typeof ref === "function") ref(el);
-    else if (ref && typeof ref === "object") (ref as React.RefObject<HTMLTextAreaElement | null>).current = el;
-  };
-
+function EntryArea({ value, onChange, onCaret, placeholder, readOnly }: EntryAreaProps) {
   return (
-    <textarea
-      ref={setRef}
-      value={value}
-      onChange={(e) => {
-        onChange(e.target.value);
-        onCaret?.(e.target.selectionStart);
-      }}
-      onKeyUp={(e) => onCaret?.((e.target as HTMLTextAreaElement).selectionStart)}
-      onClick={(e) => onCaret?.((e.target as HTMLTextAreaElement).selectionStart)}
-      placeholder={placeholder}
-      rows={1}
-      className="w-full resize-none overflow-hidden border-none bg-transparent text-[16px] leading-[1.55] text-[#1A1A1A] placeholder:italic placeholder:text-[#B8B0A7] focus:outline-none"
-    />
+    <div className="relative w-full">
+      <div
+        aria-hidden
+        className={`${ENTRY_CLASS} invisible min-h-[1.55em]`}
+      >
+        {value ? `${value}\n` : "​"}
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          onCaret?.(e.target.selectionStart);
+        }}
+        onKeyUp={(e) => onCaret?.((e.target as HTMLTextAreaElement).selectionStart)}
+        onClick={(e) => onCaret?.((e.target as HTMLTextAreaElement).selectionStart)}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        className={`${ENTRY_CLASS} absolute inset-0 h-full w-full resize-none overflow-hidden`}
+      />
+    </div>
   );
-};
+}

@@ -58,9 +58,6 @@ export default function TextJournalPage() {
           </button>
         </div>
 
-        <div className="flex h-[34px] shrink-0 items-center justify-center" aria-hidden>
-          <span className="h-[5px] w-[134px] rounded-full bg-[#1A1A1A]" />
-        </div>
       </div>
     </main>
   );
