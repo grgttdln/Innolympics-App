@@ -35,8 +35,6 @@ export type UseLiveConversation = {
 
 type TokenResponse = { token: string; model: string };
 
-const CAPTION_MAX_WORDS = 14;
-
 export function useLiveConversation(): UseLiveConversation {
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [durationMs, setDurationMs] = useState(0);
@@ -143,14 +141,9 @@ export function useLiveConversation(): UseLiveConversation {
         flushAiTurn(false);
         const finishTurn = () => {
           // Briefly show the full caption once audio finishes so the last
-          // words aren't clipped, then clear on the next tick.
+          // words aren't clipped, then clear.
           const full = aiBufferRef.current.trim();
-          if (full.length > 0) {
-            const words = full.split(/\s+/);
-            setLatestAiCaption(
-              words.slice(-CAPTION_MAX_WORDS).join(" "),
-            );
-          }
+          if (full.length > 0) setLatestAiCaption(full);
           aiBufferRef.current = "";
           setStatus("listening");
           window.setTimeout(() => setLatestAiCaption(""), 1200);
@@ -262,26 +255,20 @@ export function useLiveConversation(): UseLiveConversation {
       );
 
       // Caption-sync ticker: reveals AI transcript words in pace with
-      // how much of the audio has actually played.
+      // how much of the audio has actually played. Full transcript stays
+      // visible once revealed — no trailing-window cap.
       captionTickRef.current = window.setInterval(() => {
         const q = playbackRef.current;
         if (!q) return;
         const full = aiBufferRef.current.trim();
         if (full.length === 0) return;
         const words = full.split(/\s+/);
-        // +2 lookahead so the last 1-2 spoken words aren't clipped by
-        // playedFraction lagging real time slightly.
         const fraction = q.playedFraction();
         const revealed = Math.min(
           words.length,
           Math.max(1, Math.ceil(words.length * fraction) + 2),
         );
-        const visible = words.slice(0, revealed);
-        const tail =
-          visible.length > CAPTION_MAX_WORDS
-            ? visible.slice(-CAPTION_MAX_WORDS)
-            : visible;
-        setLatestAiCaption(tail.join(" "));
+        setLatestAiCaption(words.slice(0, revealed).join(" "));
       }, 80);
 
       setStatus("listening");
