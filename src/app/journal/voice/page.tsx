@@ -20,6 +20,7 @@ export default function VoiceJournalPage() {
   const recorder = useAudioRecorder();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const startedRef = useRef(false);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -73,7 +74,7 @@ export default function VoiceJournalPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-      <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white">
+      <div ref={frameRef} className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white">
         <div className="h-[62px] shrink-0" aria-hidden />
 
         {recorder.status === "error" ? (
@@ -119,6 +120,7 @@ export default function VoiceJournalPage() {
           open={confirmOpen}
           onOpenChange={setConfirmOpen}
           onDiscard={handleConfirmDiscard}
+          container={frameRef}
         />
       </div>
     </main>

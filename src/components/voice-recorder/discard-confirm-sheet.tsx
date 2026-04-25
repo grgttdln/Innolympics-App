@@ -1,18 +1,21 @@
 "use client";
 
+import type { RefObject } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDiscard: () => void;
+  container?: RefObject<HTMLElement | null>;
 };
 
-export function DiscardConfirmSheet({ open, onOpenChange, onDiscard }: Props) {
+export function DiscardConfirmSheet({ open, onOpenChange, onDiscard, container }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Backdrop className="absolute inset-0 z-10 bg-black/40 backdrop-blur-sm" />
-      <Dialog.Popup className="absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-white p-6 pb-8 shadow-2xl">
+      <Dialog.Portal container={container}>
+        <Dialog.Backdrop className="absolute inset-0 z-10 bg-black/40 backdrop-blur-sm" />
+        <Dialog.Popup className="absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-white p-6 pb-8 shadow-2xl">
         <Dialog.Title className="text-[18px] font-semibold text-[#1A1A1A]">
           Discard recording?
         </Dialog.Title>
@@ -38,7 +41,8 @@ export function DiscardConfirmSheet({ open, onOpenChange, onDiscard }: Props) {
             Keep recording
           </button>
         </div>
-      </Dialog.Popup>
+        </Dialog.Popup>
+      </Dialog.Portal>
     </Dialog.Root>
   );
 }
