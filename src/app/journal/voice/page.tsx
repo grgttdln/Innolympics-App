@@ -3,26 +3,32 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mic } from "lucide-react";
-import { useAudioRecorder } from "@/lib/use-audio-recorder";
-import { putRecording } from "@/lib/audio-store";
+import { useLiveConversation, type LiveError } from "@/lib/use-live-conversation";
+import { putTurns } from "@/lib/turns-store";
 import { RecordingHeader } from "@/components/voice-recorder/recording-header";
-import { LanguagePill } from "@/components/voice-recorder/language-pill";
-import { RecordingTimer } from "@/components/voice-recorder/recording-timer";
-import { RecordingWaveform } from "@/components/voice-recorder/recording-waveform";
-import { RecordingControls } from "@/components/voice-recorder/recording-controls";
-import { RecordingHelperText } from "@/components/voice-recorder/recording-helper-text";
 import { DiscardConfirmSheet } from "@/components/voice-recorder/discard-confirm-sheet";
+import { LiveStatusPill } from "@/components/voice-recorder/live-status-pill";
+import { LiveOrb } from "@/components/voice-recorder/live-orb";
+import { LiveCaption } from "@/components/voice-recorder/live-caption";
+import { LiveStopButton } from "@/components/voice-recorder/live-stop-button";
 
-const LANGUAGE = "Auto-detect · Tagalog";
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = (total % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
 
 export default function VoiceJournalPage() {
   const router = useRouter();
-  const recorder = useAudioRecorder();
+  const live = useLiveConversation();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
+  const active = live.status !== "idle" && live.status !== "error";
+
   useEffect(() => {
-    const active = recorder.status === "recording" || recorder.status === "paused";
     if (!active) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -30,32 +36,29 @@ export default function VoiceJournalPage() {
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [recorder.status]);
+  }, [active]);
 
-  const idle = recorder.status === "idle";
-  const paused = recorder.status === "paused";
-  const active = recorder.status === "recording" || recorder.status === "paused";
-
-  const controlsStatus: "idle" | "recording" | "paused" = idle
-    ? "idle"
-    : paused
-    ? "paused"
-    : "recording";
+  const headerStatus: "idle" | "recording" | "paused" = active ? "recording" : "idle";
 
   async function handleStop() {
-    const blob = await recorder.stop();
+    setSaving(true);
+    const turns = await live.stop();
+    if (turns.length === 0) {
+      router.push("/dashboard");
+      return;
+    }
     const id = crypto.randomUUID();
     try {
-      await putRecording({
+      await putTurns({
         id,
-        blob,
-        durationMs: recorder.durationMs,
-        language: LANGUAGE,
+        turns,
+        durationMs: live.durationMs,
         createdAt: Date.now(),
       });
       router.push(`/journal/voice/review?id=${id}`);
     } catch {
-      alert("Couldn't save the recording. Please try again.");
+      alert("Couldn't save the conversation. Please try again.");
+      setSaving(false);
     }
   }
 
@@ -68,51 +71,64 @@ export default function VoiceJournalPage() {
   }
 
   function handleConfirmDiscard() {
-    recorder.cancel();
+    live.cancel();
     router.push("/dashboard");
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-      <div ref={frameRef} className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white">
+      <div
+        ref={frameRef}
+        className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white"
+      >
         <div className="h-[62px] shrink-0" aria-hidden />
 
-        {recorder.status === "error" ? (
-          <ErrorFallback error={recorder.error} onRetry={() => void recorder.start()} onBack={() => router.push("/dashboard")} />
+        {live.status === "error" ? (
+          <ErrorFallback
+            error={live.error}
+            onRetry={() => void live.start()}
+            onBack={() => router.push("/dashboard")}
+          />
         ) : (
           <div className="flex flex-1 flex-col px-6">
-            <RecordingHeader status={controlsStatus} onClose={handleRequestExit} />
+            <RecordingHeader status={headerStatus} onClose={handleRequestExit} />
+
+            <div className="mt-8 flex justify-center">
+              <LiveStatusPill status={live.status} />
+            </div>
 
             <div className="mt-10 flex justify-center">
-              <LanguagePill language={LANGUAGE} />
+              <LiveOrb status={live.status} />
             </div>
 
-            <div className="mt-12">
-              <RecordingTimer durationMs={recorder.durationMs} />
-            </div>
-
-            <p className="mt-6 text-center text-[14px] text-[#8A8A8A]">
-              {idle ? "Ready to record" : paused ? "Paused" : "Recording in progress"}
-            </p>
-
-            <div className="mt-10">
-              <RecordingWaveform amplitude={recorder.amplitude} paused={!active} />
+            <div className="mt-6">
+              <LiveCaption text={live.latestAiCaption} />
             </div>
 
             <div className="flex-1" />
 
-            <div className="mb-4">
-              <RecordingControls
-                status={controlsStatus}
-                onStart={() => void recorder.start()}
-                onPauseToggle={paused ? recorder.resume : recorder.pause}
-                onStop={() => void handleStop()}
-                onCancel={handleRequestExit}
-              />
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[13px] text-[#8A8A8A]">
+                {formatDuration(live.durationMs)}
+              </span>
+              <span className="text-[13px] text-[#8A8A8A]">
+                {live.turns.length} turn{live.turns.length === 1 ? "" : "s"}
+              </span>
             </div>
 
-            <div className="mb-6">
-              <RecordingHelperText status={controlsStatus} />
+            <div className="mb-8 flex justify-center">
+              {live.status === "idle" ? (
+                <button
+                  type="button"
+                  onClick={() => void live.start()}
+                  className="flex h-[72px] w-[72px] cursor-pointer items-center justify-center rounded-full bg-[#8B5CF6] shadow-[0_8px_24px_rgba(139,92,246,0.35)] transition-opacity active:opacity-85"
+                  aria-label="Start conversation"
+                >
+                  <Mic className="h-7 w-7 text-white" strokeWidth={2} />
+                </button>
+              ) : (
+                <LiveStopButton onClick={() => void handleStop()} disabled={saving} />
+              )}
             </div>
           </div>
         )}
@@ -133,18 +149,25 @@ function ErrorFallback({
   onRetry,
   onBack,
 }: {
-  error: "mic-denied" | "mic-unavailable" | "unsupported" | "recorder-failure" | null;
+  error: LiveError | null;
   onRetry: () => void;
   onBack: () => void;
 }) {
-  const canRetry = error === "mic-denied" || error === "recorder-failure";
+  const canRetry =
+    error === "mic-denied" ||
+    error === "token-failed" ||
+    error === "socket-failed";
   const message =
     error === "mic-denied"
-      ? "We need mic access to record your journal."
+      ? "We need mic access to start the conversation."
       : error === "mic-unavailable"
       ? "No microphone found on this device."
       : error === "unsupported"
-      ? "Your browser doesn't support recording."
+      ? "Your browser doesn't support live audio."
+      : error === "token-failed"
+      ? "Couldn't start the live session. Please try again."
+      : error === "socket-failed"
+      ? "The live session disconnected. Please try again."
       : "Something went wrong. Please try again.";
 
   return (
