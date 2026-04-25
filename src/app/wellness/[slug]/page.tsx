@@ -42,9 +42,6 @@ export default async function WellnessTechniquePage({
           <span className="self-start rounded-[10px] bg-[#5B3D78] px-2.5 py-1 text-[10px] font-bold leading-none tracking-[1px] text-white">
             {technique.badge}
           </span>
-          <h2 className="text-[24px] font-bold leading-tight text-[#2A2A2A]">
-            {technique.title}
-          </h2>
           <p className="text-[15px] leading-relaxed text-[#666666]">
             {technique.description}
           </p>
