@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ChevronRight, Phone, Pencil, Check } from "lucide-react";
+import { Trash2, ChevronRight, Phone, Pencil, Check, LogOut } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
-import { loadUser, type StoredUser } from "@/lib/session";
+import { loadUser, clearUser, type StoredUser } from "@/lib/session";
 import { getGreeting } from "@/lib/greeting";
 
 /* ── Types ────────────────────────────────────────────────────── */
@@ -116,6 +116,11 @@ export default function ProfilePage() {
   const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
   const pageEntries = entries.slice(page * ENTRIES_PER_PAGE, page * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE);
 
+  const handleLogout = () => {
+    clearUser();
+    router.replace("/login");
+  };
+
   const handleDelete = (id: string) => {
     const next = entries.filter(e => e.id !== id);
     setEntries(next);
@@ -137,13 +142,23 @@ export default function ProfilePage() {
         <div className="h-[50px] shrink-0" aria-hidden />
 
         {/* ── Page header ── */}
-        <div className="px-6 pb-2 pt-5">
-          <h1 className="text-[28px] font-bold leading-tight tracking-[-0.3px] text-[#1A1A1A]">
-            Profile
-          </h1>
-          <p className="mt-0.5 text-[14px] text-[#B8B0A7]">
-            {greeting}, {user.name.split(" ")[0]} ✦
-          </p>
+        <div className="flex items-start justify-between px-6 pb-2 pt-5">
+          <div>
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.3px] text-[#1A1A1A]">
+              Profile
+            </h1>
+            <p className="mt-0.5 text-[14px] text-[#B8B0A7]">
+              {greeting}, {user.name.split(" ")[0]} ✦
+            </p>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="mt-1 flex items-center gap-1.5 rounded-[12px] border border-[#EDE5F5] px-3 py-2 text-[12px] font-medium text-[#9B8AB0] transition-all active:scale-[0.96] hover:border-[#C4A8E0] hover:text-[#7B5EA7]"
+          >
+            <LogOut size={13} />
+            Log out
+          </button>
         </div>
 
         {/* ── Scrollable body ── */}
