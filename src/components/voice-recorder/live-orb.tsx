@@ -15,7 +15,7 @@ const BAR_COUNT = 16;
 const BAR_SPACING = 12;
 const BAR_WIDTH = 3;
 
-type Bar = { x: number; h: number; delay: number };
+type Bar = { x: number; h: number };
 
 const BARS: Bar[] = Array.from({ length: BAR_COUNT }, (_, i) => {
   const centerIdx = (BAR_COUNT - 1) / 2;
@@ -24,7 +24,6 @@ const BARS: Bar[] = Array.from({ length: BAR_COUNT }, (_, i) => {
   return {
     x: (i - centerIdx) * BAR_SPACING,
     h: 16 + envelope * 56,
-    delay: 0,
   };
 });
 
@@ -32,24 +31,8 @@ export function LiveOrb({ status }: { status: LiveStatus }) {
   const accent = ACCENTS[status];
   const paused = status === "paused";
 
-  const animName =
-    status === "speaking"
-      ? "wave-fast"
-      : status === "listening" || status === "connecting"
-      ? "wave-med"
-      : "wave-idle";
-
-  const animDuration =
-    status === "speaking" ? "2.2s" : status === "listening" ? "4s" : "6.5s";
-
   return (
     <div className="relative flex h-[160px] w-[260px] items-center justify-center">
-      <style>{`
-        @keyframes wave-idle { 0%,100% { transform: scaleY(0.99); } 50% { transform: scaleY(1.01); } }
-        @keyframes wave-med  { 0%,100% { transform: scaleY(0.97); } 50% { transform: scaleY(1.02); } }
-        @keyframes wave-fast { 0%,100% { transform: scaleY(0.94); } 50% { transform: scaleY(1.04); } }
-      `}</style>
-
       {BARS.map((b, i) => (
         <span
           key={i}
@@ -65,13 +48,8 @@ export function LiveOrb({ status }: { status: LiveStatus }) {
             borderRadius: "2px",
             backgroundColor: accent,
             opacity: paused ? 0.3 : 0.95,
-            transformOrigin: "center",
-            animation: paused
-              ? "none"
-              : `${animName} ${animDuration} cubic-bezier(0.45, 0, 0.55, 1) ${b.delay}s infinite`,
             transition:
-              "background-color 500ms cubic-bezier(0.32,0.72,0,1), opacity 400ms cubic-bezier(0.32,0.72,0,1)",
-            willChange: "transform",
+              "background-color 600ms cubic-bezier(0.32,0.72,0,1), opacity 400ms cubic-bezier(0.32,0.72,0,1)",
           }}
         />
       ))}
