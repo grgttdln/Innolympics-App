@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
+import {
+  GoogleGenAI,
+  MediaResolution,
+  Modality,
+  type LiveServerMessage,
+  type Session,
+} from "@google/genai";
 import { LIVE_SYSTEM_PROMPT } from "./live-system-prompt";
 import { createPcmPlaybackQueue, type PcmPlaybackQueue } from "./pcm-playback-queue";
 import type { Turn } from "./turns-store";
@@ -234,6 +240,16 @@ export function useLiveConversation(): UseLiveConversation {
         model: tokenRes.model,
         config: {
           responseModalities: [Modality.AUDIO],
+          mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Zephyr" },
+            },
+          },
+          contextWindowCompression: {
+            triggerTokens: "104857",
+            slidingWindow: { targetTokens: "52428" },
+          },
           systemInstruction: LIVE_SYSTEM_PROMPT,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
