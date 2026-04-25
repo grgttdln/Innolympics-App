@@ -1,10 +1,13 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
+    }
+
     const { sense, userInput } = await req.json() as {
       sense: string;
       userInput: string;
@@ -13,8 +16,6 @@ export async function POST(req: NextRequest) {
     if (!userInput?.trim()) {
       return NextResponse.json({ error: 'No input provided' }, { status: 400 });
     }
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const systemPrompt = `You are an empathetic validation engine for a mental health app called Tala. The user is completing a 5-4-3-2-1 grounding exercise.
 
@@ -35,8 +36,12 @@ Output format:
 If isValid is true: The feedback should be a very brief, warm validation (e.g., "That's a great observation. Take a breath and let's continue.").
 If isValid is false: The feedback should be a gentle, non-judgmental correction asking them to try again (e.g., "I think you might be feeling your blanket rather than hearing it. Let's try listening closely again. What is one thing you can hear?").`;
 
-    const result = await model.generateContent(systemPrompt);
-    const raw = result.response.text().trim();
+    const ai = new GoogleGenAI({ apiKey });
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+    });
+    const raw = (result.text ?? '').trim();
 
     let parsed: { isValid: boolean; feedback: string };
     try {
