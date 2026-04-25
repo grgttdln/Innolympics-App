@@ -32,7 +32,7 @@ export default async function WellnessTechniquePage({
   const showGroundingGame = technique.slug === "bring-me";
   const showGrounding = technique.slug === "grounding";
   const showMindfulness = technique.slug === "mindfulness";
-  const hideHeroCopy = showMindfulness;
+  const hideHeroCopy = showMindfulness || showGroundingGame;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
