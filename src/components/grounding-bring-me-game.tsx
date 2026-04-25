@@ -210,8 +210,8 @@ export function GroundingBringMeGame() {
         }),
       });
 
-      const payload = (await response.json()) as AnalyzeResponse | { error?: string };
-      if (!response.ok || 'error' in payload) {
+      const payload = (await response.json()) as Partial<AnalyzeResponse> & { error?: string };
+      if (!response.ok || payload.error) {
         console.error(`${DEBUG_LOG_PREFIX} analysis error`, {
           status: response.status,
           payload,
@@ -222,7 +222,7 @@ export function GroundingBringMeGame() {
 
       console.log(`${DEBUG_LOG_PREFIX} analysis result`, payload);
 
-      setFeedback(payload.encouragement);
+      setFeedback(payload.encouragement ?? '');
 
       if (payload.isMatch) {
         const nextPrompt = payload.nextPrompt || getFallbackNextPrompt(prompt, round, usedPrompts);

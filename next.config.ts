@@ -9,7 +9,7 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["10.125.57.234"],
+  allowedDevOrigins: ["10.125.57.234", "10.125.57.79"],
 };
 
 export default withSerwist(nextConfig);
