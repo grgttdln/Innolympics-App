@@ -7,6 +7,8 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   AiResponseCard,
   FollowUpCard,
+  MoodChip,
+  ProfessionalHelpCard,
   SupportCard,
 } from "@/components/follow-up-card";
 import { loadUser } from "@/lib/session";
@@ -257,11 +259,18 @@ export default function FreeformWritingPage() {
           })}
 
           {aiReply ? (
-            <AiResponseCard
-              intent={aiReply.intent}
-              response={aiReply.response}
-              escalation={aiReply.needs_escalation}
-            />
+            <>
+              <MoodChip
+                moodScore={aiReply.mood_score}
+                emotions={aiReply.emotions}
+              />
+              <AiResponseCard
+                intent={aiReply.intent}
+                response={aiReply.response}
+                escalation={aiReply.needs_escalation}
+              />
+              <ProfessionalHelpCard />
+            </>
           ) : null}
 
           {submitError ? (

@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, HeartHandshake, Plus, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  HeartHandshake,
+  Phone,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 
 import type { Intent } from "@/lib/types";
 
@@ -155,6 +161,90 @@ export function AiResponseCard({
           </span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+type MoodChipProps = {
+  moodScore: number;
+  emotions: string[];
+};
+
+export function MoodChip({ moodScore, emotions }: MoodChipProps) {
+  const label =
+    moodScore > 0.3 ? "positive" : moodScore < -0.3 ? "heavy" : "neutral";
+  const tone =
+    moodScore > 0.3
+      ? "bg-[#EFF6F1] text-[#2F5C47]"
+      : moodScore < -0.3
+        ? "bg-[#FBEDE9] text-[#8A3A2E]"
+        : "bg-[#F2EEE9] text-[#6B6259]";
+  const emotionText = emotions.length ? ` · ${emotions.join(", ")}` : "";
+  return (
+    <div
+      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.6px] ${tone}`}
+    >
+      <span>{label}</span>
+      <span aria-hidden className="opacity-50">
+        ·
+      </span>
+      <span className="normal-case tracking-normal">
+        mood {moodScore.toFixed(2)}
+        {emotionText}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Static CTA pointing the user to PH mental-health professional resources.
+ * Shown on every successful submission as a gentle nudge — not a pressure
+ * card. Sits below the AI response.
+ */
+export function ProfessionalHelpCard() {
+  return (
+    <div className="flex flex-col gap-2.5 rounded-[20px] border border-[#E4E0D8] bg-white p-4">
+      <div className="flex items-center gap-1.5">
+        <span
+          aria-hidden
+          className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#1A1A1A]"
+        >
+          <Phone className="h-3 w-3 text-white" strokeWidth={2} />
+        </span>
+        <span className="text-[11px] font-bold uppercase tracking-[1px] text-[#4B423B]">
+          Talk to a professional
+        </span>
+      </div>
+
+      <p className="text-[13px] leading-[1.55] text-[#4B423B]">
+        Journaling helps, but it&apos;s not a replacement for a real
+        conversation with someone trained to listen. If you want to talk to a
+        mental health professional, here are a few ways to start:
+      </p>
+
+      <ul className="flex flex-col gap-1 text-[13px] text-[#1A1A1A]">
+        <li>
+          <span className="font-semibold">MentalHealthPH directory</span>
+          <span className="text-[#6B6259]"> · find a licensed clinician</span>
+        </li>
+        <li>
+          <span className="font-semibold">NCMH</span>
+          <span className="text-[#6B6259]"> · 1553 for appointments &amp; referrals</span>
+        </li>
+        <li>
+          <span className="font-semibold">Hopeline PH</span>
+          <span className="text-[#6B6259]"> · 0917-558-4673</span>
+        </li>
+      </ul>
+
+      <a
+        href="https://mentalhealthph.org/directory/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#1A1A1A] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 active:opacity-80"
+      >
+        Browse directory
+      </a>
     </div>
   );
 }
