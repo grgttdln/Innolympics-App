@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MODEL = "gemini-live-2.5-flash-preview";
+const MODEL = "gemini-3.1-flash-live-preview";
 
 export async function POST() {
   const apiKey = process.env.GEMINI_API_KEY;

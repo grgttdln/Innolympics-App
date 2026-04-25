@@ -10,7 +10,7 @@ import { DiscardConfirmSheet } from "@/components/voice-recorder/discard-confirm
 import { LiveStatusPill } from "@/components/voice-recorder/live-status-pill";
 import { LiveOrb } from "@/components/voice-recorder/live-orb";
 import { LiveCaption } from "@/components/voice-recorder/live-caption";
-import { LiveStopButton } from "@/components/voice-recorder/live-stop-button";
+import { RecordingControls } from "@/components/voice-recorder/recording-controls";
 
 function formatDuration(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -23,7 +23,6 @@ export default function VoiceJournalPage() {
   const router = useRouter();
   const live = useLiveConversation();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   const active = live.status !== "idle" && live.status !== "error";
@@ -38,13 +37,19 @@ export default function VoiceJournalPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [active]);
 
-  const headerStatus: "idle" | "recording" | "paused" = active ? "recording" : "idle";
+  const headerStatus: "idle" | "recording" | "paused" =
+    live.status === "paused" ? "paused" : active ? "recording" : "idle";
+
+  const controlsStatus: "idle" | "recording" | "paused" =
+    live.status === "idle"
+      ? "idle"
+      : live.status === "paused"
+      ? "paused"
+      : "recording";
 
   async function handleStop() {
-    setSaving(true);
     const turns = await live.stop();
     if (turns.length === 0) {
-      setSaving(false);
       router.push("/dashboard");
       return;
     }
@@ -59,7 +64,6 @@ export default function VoiceJournalPage() {
       router.push(`/journal/voice/review?id=${id}`);
     } catch {
       alert("Couldn't save the conversation. Please try again.");
-      setSaving(false);
     }
   }
 
@@ -117,19 +121,14 @@ export default function VoiceJournalPage() {
               </span>
             </div>
 
-            <div className="mb-8 flex justify-center">
-              {live.status === "idle" ? (
-                <button
-                  type="button"
-                  onClick={() => void live.start()}
-                  className="flex h-[72px] w-[72px] cursor-pointer items-center justify-center rounded-full bg-[#8B5CF6] shadow-[0_8px_24px_rgba(139,92,246,0.35)] transition-opacity active:opacity-85"
-                  aria-label="Start conversation"
-                >
-                  <Mic className="h-7 w-7 text-white" strokeWidth={2} />
-                </button>
-              ) : (
-                <LiveStopButton onClick={() => void handleStop()} disabled={saving} />
-              )}
+            <div className="mb-8">
+              <RecordingControls
+                status={controlsStatus}
+                onStart={() => void live.start()}
+                onPauseToggle={live.status === "paused" ? live.resume : live.pause}
+                onStop={() => void handleStop()}
+                onCancel={handleRequestExit}
+              />
             </div>
           </div>
         )}

@@ -12,6 +12,7 @@ export type LiveStatus =
   | "listening"
   | "thinking"
   | "speaking"
+  | "paused"
   | "error";
 
 export type LiveError =
@@ -30,6 +31,8 @@ export type UseLiveConversation = {
   start: () => Promise<void>;
   stop: () => Promise<Turn[]>;
   cancel: () => void;
+  pause: () => void;
+  resume: () => void;
 };
 
 type TokenResponse = { token: string; model: string };
@@ -231,20 +234,24 @@ export function useLiveConversation(): UseLiveConversation {
         model: tokenRes.model,
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: { parts: [{ text: LIVE_SYSTEM_PROMPT }] },
+          systemInstruction: LIVE_SYSTEM_PROMPT,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
         callbacks: {
-          onopen: () => {},
+          onopen: () => {
+            console.log("[live] socket open");
+          },
           onmessage: handleServerMessage,
-          onerror: () => {
+          onerror: (e) => {
+            console.error("[live] socket error", e);
             if (!aliveRef.current) return;
             setError("socket-failed");
             setStatus("error");
             teardown();
           },
-          onclose: () => {
+          onclose: (e) => {
+            console.warn("[live] socket closed", { code: e?.code, reason: e?.reason });
             if (!aliveRef.current) return;
             setError("socket-failed");
             setStatus("error");
@@ -313,5 +320,22 @@ export function useLiveConversation(): UseLiveConversation {
     setError(null);
   }, [teardown]);
 
-  return { status, durationMs, turns, latestAiCaption, error, start, stop, cancel };
+  const pause = useCallback(() => {
+    if (!aliveRef.current) return;
+    const stream = streamRef.current;
+    if (!stream) return;
+    stream.getAudioTracks().forEach((t) => (t.enabled = false));
+    playbackRef.current?.clear();
+    setStatus("paused");
+  }, []);
+
+  const resume = useCallback(() => {
+    if (!aliveRef.current) return;
+    const stream = streamRef.current;
+    if (!stream) return;
+    stream.getAudioTracks().forEach((t) => (t.enabled = true));
+    setStatus("listening");
+  }, []);
+
+  return { status, durationMs, turns, latestAiCaption, error, start, stop, cancel, pause, resume };
 }

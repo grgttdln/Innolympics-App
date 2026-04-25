@@ -8,6 +8,7 @@ const LABELS: Record<LiveStatus, string> = {
   listening: "Listening…",
   thinking: "Thinking…",
   speaking: "Speaking…",
+  paused: "Paused",
   error: "Error",
 };
 
@@ -17,6 +18,7 @@ const DOT_COLORS: Record<LiveStatus, string> = {
   listening: "bg-[#8B5CF6]",
   thinking: "bg-[#CFC9BE]",
   speaking: "bg-[#F5A623]",
+  paused: "bg-[#A0A0A0]",
   error: "bg-[#E25B5B]",
 };
 
