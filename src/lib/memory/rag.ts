@@ -24,19 +24,24 @@ export async function searchMemory(
 
   const literal = `[${queryEmbedding.join(",")}]`;
 
-  const rows = (await db.execute(sql`
+  const result = (await db.execute(sql`
     SELECT transcript, ai_response, mood_score, emotions, created_at
     FROM journal_entries
     WHERE user_id = ${userId} AND embedding IS NOT NULL
     ORDER BY embedding <=> ${literal}::vector
     LIMIT ${limit}
-  `)) as unknown as {
+  `)) as unknown;
+
+  // drizzle-orm/neon-http returns a full `QueryResult` shape
+  // (`{ fields, rows, rowCount, ... }`). Older / other drivers return a
+  // bare array. Accept both rather than guessing.
+  const rows = extractRows<{
     transcript: string;
     ai_response: string | null;
     mood_score: number;
-    emotions: string[];
+    emotions: string[] | null;
     created_at: Date | string;
-  }[];
+  }>(result);
 
   return rows.map((r) => ({
     transcript: r.transcript,
@@ -48,4 +53,18 @@ export async function searchMemory(
         ? r.created_at.toISOString()
         : String(r.created_at),
   }));
+}
+
+function extractRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  if (
+    result &&
+    typeof result === "object" &&
+    Array.isArray((result as { rows?: unknown[] }).rows)
+  ) {
+    return (result as { rows: T[] }).rows;
+  }
+  throw new Error(
+    `searchMemory: unexpected db.execute result shape — got ${typeof result}`,
+  );
 }
