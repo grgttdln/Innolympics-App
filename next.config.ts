@@ -8,6 +8,8 @@ const withSerwist = withSerwistInit({
   reloadOnOnline: true,
 });
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  allowedDevOrigins: ["10.125.57.79"],
+};
 
 export default withSerwist(nextConfig);
