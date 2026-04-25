@@ -13,7 +13,7 @@ export default function WellnessPage() {
 
         <div className="flex items-center justify-between px-5 pb-4 pt-6">
           <h2 className="text-[17px] font-bold leading-tight text-[#2A2A2A]">
-            Daily wellness tips
+            Wellness Techniques
           </h2>
         </div>
 
