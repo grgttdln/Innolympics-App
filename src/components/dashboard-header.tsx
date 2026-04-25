@@ -2,7 +2,7 @@
 
 import { Bell } from "lucide-react";
 
-import { getTagalogGreeting } from "@/lib/greeting";
+import { getGreeting } from "@/lib/greeting";
 
 type DashboardHeaderProps = {
   name: string;
@@ -11,7 +11,7 @@ type DashboardHeaderProps = {
 
 export function DashboardHeader({ name, now }: DashboardHeaderProps) {
   const trimmed = name.trim();
-  const greeting = getTagalogGreeting(now ?? new Date());
+  const greeting = getGreeting(now ?? new Date());
   const initial = trimmed ? trimmed[0].toUpperCase() : "?";
 
   return (
@@ -19,7 +19,7 @@ export function DashboardHeader({ name, now }: DashboardHeaderProps) {
       <div className="flex flex-col gap-1">
         <p className="text-[15px] leading-none text-[#666666]">{greeting}</p>
         {trimmed ? (
-          <h1 className="font-[var(--font-geist-sans)] text-[32px] font-bold leading-none tracking-[-0.5px] text-[#1A1A1A]">
+          <h1 className="font-[var(--font-geist-sans)] text-[26px] font-bold leading-none tracking-[-0.3px] text-[#1A1A1A]">
             {trimmed}
           </h1>
         ) : null}

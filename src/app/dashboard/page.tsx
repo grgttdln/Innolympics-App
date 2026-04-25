@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { BottomNav } from "@/components/bottom-nav";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { JournalPicker } from "@/components/journal-picker";
+import { WellnessTips } from "@/components/wellness-tips";
 import { loadUser, type StoredUser } from "@/lib/session";
 
 export default function DashboardPage() {
@@ -24,9 +27,13 @@ export default function DashboardPage() {
       <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white">
         <div className="h-[62px] shrink-0" aria-hidden />
 
-        <div className="flex flex-1 flex-col gap-6 px-6 pb-6">
+        <div className="flex flex-1 flex-col gap-8 px-6 pb-32">
           {user ? <DashboardHeader name={user.name} /> : null}
+          <WellnessTips />
+          <JournalPicker />
         </div>
+
+        <BottomNav />
       </div>
     </main>
   );
