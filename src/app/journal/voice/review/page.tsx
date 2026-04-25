@@ -215,16 +215,16 @@ function renderGroupedTurns(turns: TurnsRecord["turns"]) {
     else runs.push({ role: t.role, text: t.text });
   }
 
-  const groups: { heading: string | null; body: string }[] = [];
+  const groups: { heading: string | null; body: string; bodyRole: "user" | "ai" }[] = [];
   for (let i = 0; i < runs.length; i++) {
     const r = runs[i];
     if (r.role === "user") {
-      groups.push({ heading: null, body: r.text });
+      groups.push({ heading: null, body: r.text, bodyRole: "user" });
     } else if (i + 1 < runs.length && runs[i + 1].role === "user") {
-      groups.push({ heading: r.text, body: runs[i + 1].text });
+      groups.push({ heading: r.text, body: runs[i + 1].text, bodyRole: "user" });
       i++;
     } else {
-      groups.push({ heading: null, body: r.text });
+      groups.push({ heading: null, body: r.text, bodyRole: "ai" });
     }
   }
 
@@ -233,7 +233,13 @@ function renderGroupedTurns(turns: TurnsRecord["turns"]) {
       {g.heading && (
         <p className="text-[14px] italic leading-snug text-[#8A8A8A]">{g.heading}</p>
       )}
-      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[#1A1A1A]">
+      <p
+        className={
+          g.bodyRole === "ai"
+            ? "whitespace-pre-wrap text-[14px] italic leading-snug text-[#8A8A8A]"
+            : "whitespace-pre-wrap text-[15px] leading-relaxed text-[#1A1A1A]"
+        }
+      >
         {g.body}
       </p>
     </div>
