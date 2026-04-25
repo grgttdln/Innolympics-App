@@ -65,6 +65,8 @@ export function useLiveConversation(): UseLiveConversation {
   const userBufferRef = useRef("");
   const aiBufferRef = useRef("");
   const turnsRef = useRef<Turn[]>([]);
+  const aliveRef = useRef(false);
+  const startedRef = useRef(false);
 
   const pushTurn = useCallback((turn: Turn) => {
     turnsRef.current = [...turnsRef.current, turn];
@@ -84,6 +86,8 @@ export function useLiveConversation(): UseLiveConversation {
   }, [pushTurn]);
 
   const teardown = useCallback(() => {
+    aliveRef.current = false;
+    startedRef.current = false;
     if (tickRef.current !== null) {
       cancelAnimationFrame(tickRef.current);
       tickRef.current = null;
@@ -126,6 +130,7 @@ export function useLiveConversation(): UseLiveConversation {
 
   const handleServerMessage = useCallback(
     (msg: LiveServerMessage) => {
+      if (!aliveRef.current) return;
       const sc = msg.serverContent;
       if (!sc) return;
 
@@ -172,6 +177,10 @@ export function useLiveConversation(): UseLiveConversation {
       return;
     }
 
+    if (startedRef.current) return;
+    startedRef.current = true;
+    aliveRef.current = true;
+
     setError(null);
     setStatus("connecting");
     turnsRef.current = [];
@@ -189,6 +198,11 @@ export function useLiveConversation(): UseLiveConversation {
       return;
     }
 
+    if (!aliveRef.current) {
+      teardown();
+      return;
+    }
+
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -201,6 +215,11 @@ export function useLiveConversation(): UseLiveConversation {
           : "mic-unavailable",
       );
       setStatus("error");
+      return;
+    }
+
+    if (!aliveRef.current) {
+      teardown();
       return;
     }
 
@@ -223,10 +242,20 @@ export function useLiveConversation(): UseLiveConversation {
             setError("socket-failed");
             setStatus("error");
           },
-          onclose: () => {},
+          onclose: () => {
+            if (!aliveRef.current) return;
+            aliveRef.current = false;
+            setError("socket-failed");
+            setStatus("error");
+          },
         },
       });
       sessionRef.current = session;
+
+      if (!aliveRef.current) {
+        teardown();
+        return;
+      }
 
       const AudioCtx =
         window.AudioContext ??
@@ -234,6 +263,11 @@ export function useLiveConversation(): UseLiveConversation {
       const captureCtx = new AudioCtx();
       captureCtxRef.current = captureCtx;
       await captureCtx.audioWorklet.addModule("/audio-worklets/pcm-processor.js");
+
+      if (!aliveRef.current) {
+        teardown();
+        return;
+      }
       const source = captureCtx.createMediaStreamSource(stream);
       const node = new AudioWorkletNode(captureCtx, "pcm-processor");
       workletNodeRef.current = node;
