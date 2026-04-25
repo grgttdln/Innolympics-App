@@ -115,44 +115,54 @@ export function AiResponseCard({
   return (
     <div
       className={[
-        "flex flex-col gap-2.5 rounded-[20px] border p-4",
+        "flex flex-col gap-3.5 rounded-[22px] border p-5",
         isCrisis
           ? "border-[#F3D6D0] bg-[#FBEDE9]"
           : "border-[#D7E4DC] bg-[#EFF6F1]",
       ].join(" ")}
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2.5">
         <span
           aria-hidden
           className={[
-            "flex h-[22px] w-[22px] items-center justify-center rounded-full",
+            "flex h-7 w-7 items-center justify-center rounded-full shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_1px_2px_rgba(0,0,0,0.08)]",
             isCrisis ? "bg-[#C06B5D]" : "bg-[#4F8A6E]",
           ].join(" ")}
         >
           {isCrisis ? (
-            <HeartHandshake className="h-3 w-3 text-white" strokeWidth={2} />
+            <HeartHandshake className="h-3.5 w-3.5 text-white" strokeWidth={2} />
           ) : (
-            <Sparkles className="h-3 w-3 text-white" strokeWidth={2} />
+            <Sparkles className="h-3.5 w-3.5 text-white" strokeWidth={2} />
           )}
         </span>
-        <span
-          className={[
-            "text-[11px] font-bold uppercase tracking-[1px]",
-            isCrisis ? "text-[#8A3A2E]" : "text-[#2F5C47]",
-          ].join(" ")}
-        >
-          {isCrisis ? "Support" : "AI Companion"}
-        </span>
+        <div className="flex flex-col">
+          <span
+            className={[
+              "text-[13px] font-semibold tracking-[-0.1px]",
+              isCrisis ? "text-[#8A3A2E]" : "text-[#2F5C47]",
+            ].join(" ")}
+          >
+            {isCrisis ? "Support" : "AI Companion"}
+          </span>
+          <span
+            className={[
+              "text-[11px] font-medium tracking-[0.1px]",
+              isCrisis ? "text-[#B88078]" : "text-[#7AA592]",
+            ].join(" ")}
+          >
+            {isCrisis ? "Here to help, right now" : "Wrote back just now"}
+          </span>
+        </div>
       </div>
 
-      <p className="whitespace-pre-wrap text-[14px] leading-[1.55] text-[#1A1A1A]">
+      <p className="whitespace-pre-wrap text-[15px] leading-[1.6] text-[#1A1A1A]">
         {response}
       </p>
 
       {escalation && !isCrisis ? (
-        <div className="flex items-start gap-1.5 rounded-[12px] bg-white/60 px-3 py-2 text-[12px] text-[#6B4A43]">
+        <div className="flex items-start gap-2 rounded-[14px] border border-[#F3D6D0] bg-white/70 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[#6B4A43]">
           <AlertTriangle
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C06B5D]"
+            className="mt-0.5 h-4 w-4 shrink-0 text-[#C06B5D]"
             strokeWidth={2}
           />
           <span>

@@ -59,7 +59,7 @@ export function InsightsDialog({
               <Sparkles className="h-3 w-3 text-white" strokeWidth={2} />
             </span>
             <Dialog.Title className="text-[14px] font-semibold tracking-[-0.2px] text-[#1A1A1A]">
-              Reflective insights
+              Reflective Insights
             </Dialog.Title>
           </header>
 
