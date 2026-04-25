@@ -8,6 +8,20 @@
       "when": 1777114273730,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777116171988,
+      "tag": "0001_tearful_hedge_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777116886958,
+      "tag": "0002_friendly_lester",
+      "breakpoints": true
     }
   ]
 }
