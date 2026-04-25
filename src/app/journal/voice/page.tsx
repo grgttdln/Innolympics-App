@@ -7,7 +7,6 @@ import { useLiveConversation, type LiveError } from "@/lib/use-live-conversation
 import { putTurns } from "@/lib/turns-store";
 import { RecordingHeader } from "@/components/voice-recorder/recording-header";
 import { DiscardConfirmSheet } from "@/components/voice-recorder/discard-confirm-sheet";
-import { LiveStatusPill } from "@/components/voice-recorder/live-status-pill";
 import { LiveOrb } from "@/components/voice-recorder/live-orb";
 import { RecordingControls } from "@/components/voice-recorder/recording-controls";
 
@@ -93,11 +92,7 @@ export default function VoiceJournalPage() {
           <div className="flex flex-1 flex-col px-6">
             <RecordingHeader status={uiStatus} onClose={handleRequestExit} />
 
-            <div className="mt-8 flex justify-center">
-              <LiveStatusPill status={live.status} />
-            </div>
-
-            <div className="mt-10 flex justify-center">
+            <div className="mt-16 flex justify-center">
               <LiveOrb status={live.status} />
             </div>
 
