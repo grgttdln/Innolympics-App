@@ -20,10 +20,6 @@ export function AuthShell({
   const router = useRouter();
 
   function handleBack() {
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
     router.push(backHref);
   }
 
