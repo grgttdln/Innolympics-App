@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { FollowUpCard, SupportCard } from "@/components/follow-up-card";
+import { InsightsDialog } from "@/components/insights-dialog";
 import { loadUser } from "@/lib/session";
+import type { JournalApiResponse } from "@/lib/types";
 
 const IDLE_MS = 3000;
 const COOLDOWN_MS = 15000;
@@ -41,9 +44,15 @@ export default function FreeformWritingPage() {
   const [locked, setLocked] = useState(false);
   const [meta, setMeta] = useState<{ day: string; time: string } | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [aiReply, setAiReply] = useState<JournalApiResponse | null>(null);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const caretRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setMeta(formatDate(new Date()));
@@ -135,9 +144,46 @@ export default function FreeformWritingPage() {
   const hasContent = blocks.some((b) => b.value.trim().length > 0);
   const lastIdx = blocks.length - 1;
 
+  const handleSubmit = async () => {
+    if (!userId || submitting || locked) return;
+    const transcript = blocks
+      .map((b) => (b.kind === "question" ? `\n${b.value}\n` : b.value))
+      .join("")
+      .trim();
+    if (!transcript) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/journal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": String(userId),
+        },
+        body: JSON.stringify({ transcript, input_type: "text" }),
+      });
+      if (!res.ok) {
+        setSubmitError("Something went wrong. Please try again.");
+        return;
+      }
+      const data = (await res.json()) as JournalApiResponse;
+      setAiReply(data);
+      setInsightsOpen(true);
+      if (data.intent === "crisis") setLocked(true);
+    } catch {
+      setSubmitError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="flex min-h-[100dvh] items-stretch justify-center bg-neutral-100 sm:items-center">
-      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#FCFAF7] sm:h-[844px] sm:w-[390px] sm:rounded-[40px]">
+      <div
+        ref={frameRef}
+        className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#FCFAF7] sm:h-[844px] sm:w-[390px] sm:rounded-[40px]"
+      >
         <div className="hidden h-[54px] shrink-0 sm:block" aria-hidden />
 
         <header className="flex flex-col gap-1.5 px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2.5rem)] sm:pt-10">
@@ -215,8 +261,27 @@ export default function FreeformWritingPage() {
             );
           })}
 
+          {submitError ? (
+            <p className="text-[13px] text-[#8A3A2E]">{submitError}</p>
+          ) : null}
+
           {locked ? <SupportCard /> : null}
         </div>
+
+        <InsightsDialog
+          open={insightsOpen}
+          onOpenChange={(next) => {
+            setInsightsOpen(next);
+            if (!next && aiReply) {
+              // After the user reads their insights and dismisses the
+              // dialog, take them back to the dashboard. `replace` so
+              // Back doesn't return to a stale freeform draft.
+              router.replace("/dashboard");
+            }
+          }}
+          reply={aiReply}
+          container={frameRef}
+        />
 
         <div className="shrink-0 border-t border-[#EFE8E0] bg-[#FCFAF7] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
           <div className="flex items-center gap-2.5">
@@ -229,11 +294,14 @@ export default function FreeformWritingPage() {
             </Link>
             <button
               type="button"
-              disabled={!hasContent || locked}
+              onClick={handleSubmit}
+              disabled={!hasContent || locked || submitting || !userId}
               className="flex h-[52px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[26px] bg-[#1A1A1A] text-[15px] font-semibold tracking-[0.1px] text-[#FCFAF7] shadow-[0_6px_20px_rgba(26,26,26,0.2)] transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Submit
-              <ArrowRight className="h-4 w-4" strokeWidth={2} />
+              {submitting ? "Sending…" : "Submit"}
+              {submitting ? null : (
+                <ArrowRight className="h-4 w-4" strokeWidth={2} />
+              )}
             </button>
           </div>
         </div>
