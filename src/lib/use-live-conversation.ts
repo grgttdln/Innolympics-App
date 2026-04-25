@@ -37,12 +37,6 @@ type TokenResponse = { token: string; model: string };
 
 const CAPTION_MAX_WORDS = 14;
 
-function tailWords(text: string, max: number): string {
-  const words = text.trim().split(/\s+/);
-  if (words.length <= max) return words.join(" ");
-  return words.slice(-max).join(" ");
-}
-
 export function useLiveConversation(): UseLiveConversation {
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [durationMs, setDurationMs] = useState(0);
@@ -57,6 +51,7 @@ export function useLiveConversation(): UseLiveConversation {
   const playbackRef = useRef<PcmPlaybackQueue | null>(null);
   const startedAtRef = useRef(0);
   const tickRef = useRef<number | null>(null);
+  const captionTickRef = useRef<number | null>(null);
   const userBufferRef = useRef("");
   const aiBufferRef = useRef("");
   const turnsRef = useRef<Turn[]>([]);
@@ -87,6 +82,10 @@ export function useLiveConversation(): UseLiveConversation {
       clearInterval(tickRef.current);
       tickRef.current = null;
     }
+    if (captionTickRef.current !== null) {
+      clearInterval(captionTickRef.current);
+      captionTickRef.current = null;
+    }
     if (workletNodeRef.current) {
       workletNodeRef.current.port.onmessage = null;
       workletNodeRef.current.disconnect();
@@ -114,7 +113,6 @@ export function useLiveConversation(): UseLiveConversation {
       if (sc.inputTranscription?.text) {
         userBufferRef.current += sc.inputTranscription.text;
       }
-      let sawAudioThisMessage = false;
       for (const part of sc.modelTurn?.parts ?? []) {
         const inline = part.inlineData;
         if (inline?.data && inline.mimeType?.startsWith("audio/pcm")) {
@@ -126,17 +124,13 @@ export function useLiveConversation(): UseLiveConversation {
           if (aiBufferRef.current.length === 0) setLatestAiCaption("");
           playbackRef.current?.enqueue(pcm);
           setStatus("speaking");
-          sawAudioThisMessage = true;
         }
       }
 
-      // Only reveal caption once audio is actually playing for this turn —
-      // Gemini emits transcription slightly ahead of the audio.
+      // Accumulate transcript but do NOT reveal it yet — the caption
+      // ticker below reveals words progressively in sync with audio.
       if (sc.outputTranscription?.text) {
         aiBufferRef.current += sc.outputTranscription.text;
-        if (sawAudioThisMessage || playbackRef.current?.isPlaying()) {
-          setLatestAiCaption(tailWords(aiBufferRef.current, CAPTION_MAX_WORDS));
-        }
       }
 
       if (sc.generationComplete || sc.turnComplete) {
@@ -251,6 +245,25 @@ export function useLiveConversation(): UseLiveConversation {
         () => setDurationMs(Date.now() - startedAtRef.current),
         1000,
       );
+
+      // Caption-sync ticker: reveals AI transcript words in pace with
+      // how much of the audio has actually played.
+      captionTickRef.current = window.setInterval(() => {
+        const q = playbackRef.current;
+        if (!q) return;
+        const full = aiBufferRef.current.trim();
+        if (full.length === 0) return;
+        const words = full.split(/\s+/);
+        const fraction = q.playedFraction();
+        const revealed = Math.max(1, Math.ceil(words.length * fraction));
+        const visible = words.slice(0, revealed);
+        const tail =
+          visible.length > CAPTION_MAX_WORDS
+            ? visible.slice(-CAPTION_MAX_WORDS)
+            : visible;
+        setLatestAiCaption(tail.join(" "));
+      }, 90);
+
       setStatus("listening");
     } catch (err) {
       console.error("[live] connect failed:", err);
