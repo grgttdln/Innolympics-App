@@ -39,10 +39,12 @@ export function JournalPicker({ date = new Date() }: { date?: Date } = {}) {
   return (
     <section
       aria-labelledby="journal-picker-heading"
-      className="flex flex-1 flex-col justify-between gap-6 rounded-[28px] bg-white px-[22px] py-[26px]"
+      className="flex flex-col"
     >
       <div className="flex flex-col gap-6">
-        <DateChip date={date} />
+        <div className="mt-4">
+          <DateChip date={date} />
+        </div>
 
         <div className="flex flex-col gap-3">
           <h2
@@ -63,7 +65,7 @@ export function JournalPicker({ date = new Date() }: { date?: Date } = {}) {
         </ul>
       </div>
 
-      <p className="flex items-center justify-center gap-1.5 pt-2 text-[11px] font-medium text-[#B8B0A7]">
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#B8B0A7]">
         <ShieldCheck className="h-3 w-3" strokeWidth={1.75} aria-hidden />
         Private — only you can see this
       </p>
@@ -94,26 +96,26 @@ function ModeCard({ mode }: { mode: Mode }) {
     <li>
       <Link
         href={mode.href}
-        className={`group flex cursor-pointer items-center gap-[18px] rounded-[22px] px-[22px] py-[26px] ring-2 ring-inset ring-transparent transition-shadow duration-200 focus-visible:outline-none ${mode.hoverRing} ${mode.card}`}
+        className={`group flex cursor-pointer items-center gap-5 rounded-[26px] px-6 py-8 ring-2 ring-inset ring-transparent transition-shadow duration-200 focus-visible:outline-none ${mode.hoverRing} ${mode.card}`}
       >
         <span
           aria-hidden
-          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${mode.iconWrap}`}
+          className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${mode.iconWrap}`}
         >
-          <Icon className="h-[26px] w-[26px] text-white" strokeWidth={1.75} />
+          <Icon className="h-[30px] w-[30px] text-white" strokeWidth={1.75} />
         </span>
 
         <div className="flex flex-1 flex-col gap-1.5">
-          <span className="text-[22px] font-bold leading-[1.15] tracking-[-0.4px] text-white">
+          <span className="text-[26px] font-bold leading-[1.15] tracking-[-0.4px] text-white">
             {mode.title}
           </span>
-          <span className={`text-[13px] font-medium leading-snug ${mode.accent}`}>
+          <span className={`text-[14px] font-medium leading-snug ${mode.accent}`}>
             {mode.description}
           </span>
         </div>
 
         <ArrowUpRight
-          className="h-[18px] w-[18px] shrink-0 text-white transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          className="h-5 w-5 shrink-0 text-white transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
           strokeWidth={1.75}
           aria-hidden
         />
