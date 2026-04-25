@@ -44,6 +44,7 @@ export default function VoiceJournalPage() {
     setSaving(true);
     const turns = await live.stop();
     if (turns.length === 0) {
+      setSaving(false);
       router.push("/dashboard");
       return;
     }

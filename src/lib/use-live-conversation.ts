@@ -239,14 +239,16 @@ export function useLiveConversation(): UseLiveConversation {
           onopen: () => {},
           onmessage: handleServerMessage,
           onerror: () => {
+            if (!aliveRef.current) return;
             setError("socket-failed");
             setStatus("error");
+            teardown();
           },
           onclose: () => {
             if (!aliveRef.current) return;
-            aliveRef.current = false;
             setError("socket-failed");
             setStatus("error");
+            teardown();
           },
         },
       });
