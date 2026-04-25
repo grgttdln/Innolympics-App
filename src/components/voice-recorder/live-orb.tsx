@@ -40,14 +40,14 @@ export function LiveOrb({ status }: { status: LiveStatus }) {
       : "wave-idle";
 
   const animDuration =
-    status === "speaking" ? "0.9s" : status === "listening" ? "1.8s" : "3.6s";
+    status === "speaking" ? "1.4s" : status === "listening" ? "2.8s" : "5.2s";
 
   return (
     <div className="relative flex h-[160px] w-[260px] items-center justify-center">
       <style>{`
-        @keyframes wave-idle { 0%,100% { transform: scaleY(0.85); } 50% { transform: scaleY(1.05); } }
-        @keyframes wave-med  { 0%,100% { transform: scaleY(0.55); } 45% { transform: scaleY(1.08); } }
-        @keyframes wave-fast { 0%,100% { transform: scaleY(0.45); } 30% { transform: scaleY(1.2); } 65% { transform: scaleY(0.7); } }
+        @keyframes wave-idle { 0%,100% { transform: scaleY(0.96); } 50% { transform: scaleY(1.02); } }
+        @keyframes wave-med  { 0%,100% { transform: scaleY(0.9);  } 50% { transform: scaleY(1.05); } }
+        @keyframes wave-fast { 0%,100% { transform: scaleY(0.85); } 50% { transform: scaleY(1.1);  } }
       `}</style>
 
       {BARS.map((b, i) => (
