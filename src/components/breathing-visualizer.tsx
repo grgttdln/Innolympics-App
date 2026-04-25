@@ -11,11 +11,6 @@ type BreathingVisualizerProps = {
   mode: 'box' | 'circle';
 };
 
-type PositionedPoint = {
-  x: number;
-  y: number;
-};
-
 const BOX_PATTERN: readonly BreathPhase[] = [
   { label: 'Inhale', durationMs: 4000 },
   { label: 'Hold', durationMs: 4000 },
@@ -29,162 +24,255 @@ const CIRCLE_PATTERN: readonly BreathPhase[] = [
   { label: 'Exhale', durationMs: 6000 },
 ];
 
-const TICK_MS = 50;
-
 function getCycleDuration(pattern: readonly BreathPhase[]): number {
   return pattern.reduce((sum, phase) => sum + phase.durationMs, 0);
 }
 
-function getCurrentPhase(pattern: readonly BreathPhase[], elapsedInCycleMs: number): {
+function getCurrentPhase(
+  pattern: readonly BreathPhase[],
+  elapsedInCycleMs: number
+): {
   phase: BreathPhase;
+  phaseIndex: number;
   phaseProgress: number;
   cycleProgress: number;
+  remainingMs: number;
 } {
   const cycleDuration = getCycleDuration(pattern);
   const cycleProgress = elapsedInCycleMs / cycleDuration;
 
   let offset = 0;
 
-  for (const phase of pattern) {
+  for (let index = 0; index < pattern.length; index += 1) {
+    const phase = pattern[index];
     const phaseStart = offset;
     const phaseEnd = phaseStart + phase.durationMs;
 
     if (elapsedInCycleMs >= phaseStart && elapsedInCycleMs < phaseEnd) {
       const phaseProgress = (elapsedInCycleMs - phaseStart) / phase.durationMs;
-      return { phase, phaseProgress, cycleProgress };
+      const remainingMs = phase.durationMs - (elapsedInCycleMs - phaseStart);
+      return { phase, phaseIndex: index, phaseProgress, cycleProgress, remainingMs };
     }
 
     offset = phaseEnd;
   }
 
-  const fallbackPhase = pattern[pattern.length - 1];
+  const fallbackIndex = pattern.length - 1;
   return {
-    phase: fallbackPhase,
+    phase: pattern[fallbackIndex],
+    phaseIndex: fallbackIndex,
     phaseProgress: 1,
     cycleProgress: 1,
+    remainingMs: 0,
   };
 }
 
-function getSquarePoint(progress: number, size: number, inset: number): PositionedPoint {
-  const side = size - inset * 2;
-  const perimeter = side * 4;
-  const distance = progress * perimeter;
+function usePrefersReducedMotion(): boolean {
+  const [prefers, setPrefers] = useState(false);
 
-  if (distance <= side) {
-    return { x: inset + distance, y: inset };
-  }
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- subscribe to browser matchMedia on mount
+    setPrefers(mq.matches);
+    const handler = (event: MediaQueryListEvent) => setPrefers(event.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
-  if (distance <= side * 2) {
-    return { x: size - inset, y: inset + (distance - side) };
-  }
+  return prefers;
+}
 
-  if (distance <= side * 3) {
-    return { x: size - inset - (distance - side * 2), y: size - inset };
-  }
-
-  return { x: inset, y: size - inset - (distance - side * 3) };
+function PhaseDots({
+  count,
+  activeIndex,
+}: {
+  count: number;
+  activeIndex: number;
+}) {
+  return (
+    <div className="flex items-center gap-2" aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <span
+          key={i}
+          className={`h-1.5 rounded-full transition-all duration-300 ${
+            i === activeIndex ? 'w-6 bg-[#5B3D78]' : 'w-1.5 bg-[#E9DAF2]'
+          }`}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function BreathingVisualizer({ mode }: BreathingVisualizerProps) {
   const pattern = mode === 'box' ? BOX_PATTERN : CIRCLE_PATTERN;
   const cycleDuration = useMemo(() => getCycleDuration(pattern), [pattern]);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    const start = Date.now();
-    const timer = setInterval(() => {
-      const delta = Date.now() - start;
-      setElapsedMs(delta % cycleDuration);
-    }, TICK_MS);
+    if (prefersReducedMotion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset animation frame when user prefers reduced motion
+      setElapsedMs(0);
+      return;
+    }
 
-    return () => clearInterval(timer);
-  }, [cycleDuration]);
+    const start = performance.now();
+    let rafId = 0;
 
-  const { phase, phaseProgress, cycleProgress } = getCurrentPhase(pattern, elapsedMs);
+    const loop = (now: number) => {
+      setElapsedMs((now - start) % cycleDuration);
+      rafId = requestAnimationFrame(loop);
+    };
+
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [cycleDuration, prefersReducedMotion]);
+
+  const { phase, phaseIndex, phaseProgress, cycleProgress, remainingMs } = getCurrentPhase(
+    pattern,
+    elapsedMs
+  );
+  const secondsLeft = Math.max(1, Math.ceil(remainingMs / 1000));
 
   if (mode === 'box') {
-    const size = 280;
-    const inset = 22;
-    const dot = getSquarePoint(cycleProgress, size, inset);
+    const size = 272;
+    const stroke = 6;
+    const inset = stroke / 2;
+    const radius = 36;
+    const innerSize = size - stroke;
+    const perimeter = 4 * innerSize - 8 * radius + 2 * Math.PI * radius;
+    const drawn = cycleProgress * perimeter;
 
     return (
       <section
-        aria-label="Animated box breathing guide"
-        className="flex w-full max-w-[320px] flex-col items-center gap-4"
+        aria-label="Box breathing guide, four by four cadence"
+        className="flex w-full flex-col items-center gap-6"
       >
-        <div className="text-center">
-          <p className="text-[28px] font-semibold leading-tight text-[#5B6395]">
-            Pause. Breathe.
-          </p>
-          <p className="pt-1 text-[14px] text-[#7D82A8]">4-4-4-4 cadence</p>
-        </div>
-
         <div
           className="relative"
           style={{ width: `${size}px`, height: `${size}px` }}
         >
-          <div className="absolute inset-0 rounded-[28px] border-14 border-[#2F3568]" />
-          <div className="absolute inset-9 rounded-[12px] border border-[#4A548E]/40" />
+          <div className="absolute inset-4 rounded-[28px] bg-gradient-to-br from-[#FFFFFF] to-[#F5EEE4] shadow-[0_1px_2px_rgba(91,61,120,0.06),0_18px_40px_-20px_rgba(91,61,120,0.25)]" />
+          <div className="absolute inset-8 rounded-[22px] border border-[#F1E4D0]" />
 
-          <div
-            className="absolute left-0 top-0 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#CCC1FF] shadow-[0_0_0_3px_rgba(204,193,255,0.28)]"
-            style={{ transform: `translate(${dot.x}px, ${dot.y}px)` }}
+          <svg
+            className="absolute inset-0 h-full w-full"
+            viewBox={`0 0 ${size} ${size}`}
             aria-hidden
-          />
+          >
+            <rect
+              x={inset}
+              y={inset}
+              width={innerSize}
+              height={innerSize}
+              rx={radius}
+              fill="none"
+              stroke="#EFE2F3"
+              strokeWidth={stroke}
+            />
+            <rect
+              x={inset}
+              y={inset}
+              width={innerSize}
+              height={innerSize}
+              rx={radius}
+              fill="none"
+              stroke="url(#box-stroke)"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={perimeter}
+              strokeDashoffset={prefersReducedMotion ? 0 : perimeter - drawn}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+              style={{
+                transition: prefersReducedMotion
+                  ? undefined
+                  : 'stroke-dashoffset 80ms linear',
+              }}
+            />
+            <defs>
+              <linearGradient id="box-stroke" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#A881C2" />
+                <stop offset="100%" stopColor="#5B3D78" />
+              </linearGradient>
+            </defs>
+          </svg>
 
-          <div className="absolute inset-0 flex items-center justify-center px-10 text-center">
-            <span className="text-[48px] font-semibold leading-none text-[#3C457E]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span
+              aria-live="polite"
+              className="text-[36px] font-bold leading-none text-[#2A2A2A]"
+            >
               {phase.label}
+            </span>
+            <span className="pt-4 text-[56px] font-semibold leading-none text-[#5B3D78] tabular-nums">
+              {secondsLeft}
+            </span>
+            <span className="pt-2 text-[10px] font-semibold uppercase tracking-[2px] text-[#B8A8C4]">
+              seconds
             </span>
           </div>
         </div>
+
+        <p className="text-[13px] leading-normal text-[#8A8274]">
+          Four seconds each side. Follow the line.
+        </p>
       </section>
     );
   }
 
   const radiusPx = 112;
   const innerSize = 180;
-  const ringWidth = 12;
-  const inhaleProgress = phase.label === 'Inhale' ? phaseProgress : phase.label === 'Hold' ? 1 : 0;
-  const circleScale = 0.84 + inhaleProgress * 0.16;
+  const inhaleProgress =
+    phase.label === 'Inhale'
+      ? phaseProgress
+      : phase.label === 'Hold'
+      ? 1
+      : 1 - phaseProgress;
+  const circleScale = 0.85 + inhaleProgress * 0.15;
 
   return (
     <section
-      aria-label="Animated calming breathing circle"
-      className="flex w-full max-w-[320px] flex-col items-center gap-4"
+      aria-label="Calming breathing circle"
+      className="flex w-full flex-col items-center gap-6"
     >
-      <div className="text-center">
-        <p className="text-[28px] font-semibold leading-tight text-[#5B6395]">
-          Settle your breath.
-        </p>
-        <p className="pt-1 text-[14px] text-[#7D82A8]">4s inhale, 2s hold, 6s exhale</p>
-      </div>
-
       <div
-        className="relative grid place-items-center rounded-full"
-        style={{ width: `${radiusPx * 2 + ringWidth * 2}px`, height: `${radiusPx * 2 + ringWidth * 2}px` }}
+        className="relative grid place-items-center"
+        style={{
+          width: `${radiusPx * 2 + 24}px`,
+          height: `${radiusPx * 2 + 24}px`,
+        }}
       >
         <div
-          className="absolute rounded-full border-12 border-[#CFC3FF]"
+          className="absolute rounded-full border border-[#E9DAF2]"
           style={{
-            width: `${radiusPx * 2 + ringWidth}px`,
-            height: `${radiusPx * 2 + ringWidth}px`,
+            width: `${radiusPx * 2 + 24}px`,
+            height: `${radiusPx * 2 + 24}px`,
           }}
         />
 
         <div
-          className="grid place-items-center rounded-full bg-[#3A4279] text-center transition-transform"
+          className="grid place-items-center rounded-full bg-[#5B3D78] text-center"
           style={{
             width: `${innerSize}px`,
             height: `${innerSize}px`,
-            transform: `scale(${circleScale})`,
+            transform: prefersReducedMotion ? undefined : `scale(${circleScale})`,
           }}
         >
-          <span className="px-6 text-[48px] font-semibold leading-[1.05] text-[#EEF0FF]">
-            {phase.label}
-          </span>
+          <div className="flex flex-col items-center">
+            <span
+              aria-live="polite"
+              className="text-[36px] font-bold leading-none text-white"
+            >
+              {phase.label}
+            </span>
+            <span className="pt-2 text-[12px] font-semibold text-[#E9DAF2] tabular-nums">
+              {secondsLeft}s
+            </span>
+          </div>
         </div>
       </div>
+
+      <PhaseDots count={CIRCLE_PATTERN.length} activeIndex={phaseIndex} />
     </section>
   );
 }

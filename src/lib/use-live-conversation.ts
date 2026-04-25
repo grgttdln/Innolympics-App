@@ -1,9 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
+import {
+  GoogleGenAI,
+  MediaResolution,
+  Modality,
+  type LiveServerMessage,
+  type Session,
+} from "@google/genai";
 import { createPcmPlaybackQueue, type PcmPlaybackQueue } from "./pcm-playback-queue";
 import type { Turn } from "./turns-store";
+import { scanForCrisis } from "@/lib/safety/crisis-scanner";
+import { VOICE_UNIFIED_PROMPT } from "@/lib/agents/prompts/voice-unified";
+import { CRISIS_INTERCEPT_PH } from "@/lib/safety/crisis-templates";
 
 export type LiveStatus =
   | "idle"
@@ -18,7 +27,14 @@ export type LiveError =
   | "socket-failed"
   | "mic-denied"
   | "mic-unavailable"
-  | "unsupported";
+  | "unsupported"
+  | "auth-required";
+
+export type CrisisIntercept = {
+  keywords: string[];
+  message: string;
+  triggeredAt: number;
+};
 
 export type UseLiveConversation = {
   status: LiveStatus;
@@ -26,6 +42,7 @@ export type UseLiveConversation = {
   turns: Turn[];
   latestAiCaption: string;
   error: LiveError | null;
+  crisisIntercept: CrisisIntercept | null;
   start: () => Promise<void>;
   stop: () => Promise<Turn[]>;
   cancel: () => void;
@@ -35,12 +52,22 @@ export type UseLiveConversation = {
 
 type TokenResponse = { token: string; model: string };
 
-export function useLiveConversation(): UseLiveConversation {
+type UseLiveConversationOptions = {
+  /** Integer user id from `loadUser()`. Required so the client-side crisis
+   *  interceptor can log escalation events against the right account. */
+  userId: number | null;
+};
+
+export function useLiveConversation(
+  { userId }: UseLiveConversationOptions = { userId: null },
+): UseLiveConversation {
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [durationMs, setDurationMs] = useState(0);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [latestAiCaption, setLatestAiCaption] = useState("");
   const [error, setError] = useState<LiveError | null>(null);
+  const [crisisIntercept, setCrisisIntercept] =
+    useState<CrisisIntercept | null>(null);
 
   const sessionRef = useRef<Session | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -55,6 +82,16 @@ export function useLiveConversation(): UseLiveConversation {
   const turnsRef = useRef<Turn[]>([]);
   const aliveRef = useRef(false);
   const pausedRef = useRef(false);
+
+  // Per-session safety state.
+  const userIdRef = useRef<number | null>(userId);
+  const elevatedCautionRef = useRef(false);
+  const crisisInterceptedRef = useRef(false);
+
+  // Keep userIdRef in sync so mid-session session changes don't break writes.
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
 
   const pushTurn = useCallback((turn: Turn) => {
     turnsRef.current = [...turnsRef.current, turn];
@@ -106,13 +143,63 @@ export function useLiveConversation(): UseLiveConversation {
 
   useEffect(() => () => teardown(), [teardown]);
 
+  /**
+   * Client-side crisis interceptor. Runs on every input transcription
+   * chunk; on a positive hit it stops audio playback, logs an escalation
+   * event to the backend, and raises session-wide elevatedCaution so the
+   * next turn gets special handling. Fail-safe: pure regex, no network
+   * in the hot path.
+   */
+  const checkCrisisAndIntercept = useCallback((chunk: string) => {
+    if (crisisInterceptedRef.current) return;
+    const scan = scanForCrisis(chunk);
+    if (!scan.detected) return;
+
+    crisisInterceptedRef.current = true;
+    elevatedCautionRef.current = true;
+
+    // 1. Pause Gemini audio immediately — the user needs the hotlines,
+    //    not whatever the model was saying when the trigger hit.
+    playbackRef.current?.clear();
+
+    // 2. Surface the crisis card in UI state.
+    setCrisisIntercept({
+      keywords: scan.keywords,
+      message: CRISIS_INTERCEPT_PH,
+      triggeredAt: Date.now(),
+    });
+
+    // 3. Fire-and-forget escalation log. Don't await.
+    const uid = userIdRef.current;
+    if (uid !== null) {
+      fetch("/api/escalation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": String(uid),
+        },
+        body: JSON.stringify({
+          trigger_type: "keyword_match",
+          severity: 10,
+          context: {
+            source: "voice_client_scanner",
+            keywords: scan.keywords,
+            transcript_chunk: chunk.slice(0, 500),
+          },
+        }),
+      }).catch((err) => console.warn("[live] escalation log failed", err));
+    }
+  }, []);
+
   const handleServerMessage = useCallback(
     (msg: LiveServerMessage) => {
       const sc = msg.serverContent;
       if (!sc) return;
 
       if (sc.inputTranscription?.text) {
-        userBufferRef.current += sc.inputTranscription.text;
+        const chunk = sc.inputTranscription.text;
+        userBufferRef.current += chunk;
+        checkCrisisAndIntercept(chunk);
       }
       for (const part of sc.modelTurn?.parts ?? []) {
         const inline = part.inlineData;
@@ -139,6 +226,7 @@ export function useLiveConversation(): UseLiveConversation {
         // Save the AI turn to history but KEEP the text buffer alive so
         // the caption ticker can keep revealing words while audio plays.
         flushAiTurn(false);
+
         const finishTurn = () => {
           // Briefly show the full caption once audio finishes so the last
           // words aren't clipped, then clear.
@@ -157,13 +245,18 @@ export function useLiveConversation(): UseLiveConversation {
 
       if (sc.interrupted) playbackRef.current?.clear();
     },
-    [flushAiTurn, flushUserTurn],
+    [checkCrisisAndIntercept, flushAiTurn, flushUserTurn],
   );
 
   const start = useCallback(async () => {
     if (typeof window === "undefined") return;
     if (!navigator.mediaDevices?.getUserMedia || typeof AudioWorkletNode === "undefined") {
       setError("unsupported");
+      setStatus("error");
+      return;
+    }
+    if (userIdRef.current === null) {
+      setError("auth-required");
       setStatus("error");
       return;
     }
@@ -175,6 +268,9 @@ export function useLiveConversation(): UseLiveConversation {
     turnsRef.current = [];
     setTurns([]);
     setLatestAiCaption("");
+    setCrisisIntercept(null);
+    crisisInterceptedRef.current = false;
+    elevatedCautionRef.current = false;
 
     let tokenRes: TokenResponse;
     try {
@@ -204,7 +300,33 @@ export function useLiveConversation(): UseLiveConversation {
       const ai = new GoogleGenAI({ apiKey: tokenRes.token });
       const session = await ai.live.connect({
         model: tokenRes.model,
-        config: { responseModalities: [Modality.AUDIO] },
+        config: {
+          // Baseline matches commit 429928d which was the last known-good
+          // config for gemini-3.1-flash-live-preview. The Phase 3 rewrite
+          // dropped contextWindowCompression and the transcription configs
+          // when swapping in the unified system prompt, which is what
+          // broke the session. Restoring all four baseline fields and
+          // layering the Phase 3 additions on top.
+          responseModalities: [Modality.AUDIO],
+          mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Zephyr" },
+            },
+          },
+          contextWindowCompression: {
+            triggerTokens: "104857",
+            slidingWindow: { targetTokens: "52428" },
+          },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+          // The system prompt steers persona, tone, and crisis protocol.
+          // We deliberately don't register tools here — during the Live
+          // session the AI is a conversational companion, not an analyst.
+          // Memory retrieval + classification + escalation run server-side
+          // against the *full* transcript when the user hits Save.
+          systemInstruction: VOICE_UNIFIED_PROMPT,
+        },
         callbacks: {
           onopen: () => console.log("[live] socket open"),
           onmessage: handleServerMessage,
@@ -297,6 +419,9 @@ export function useLiveConversation(): UseLiveConversation {
     turnsRef.current = [];
     setLatestAiCaption("");
     setError(null);
+    setCrisisIntercept(null);
+    crisisInterceptedRef.current = false;
+    elevatedCautionRef.current = false;
   }, [teardown]);
 
   const pause = useCallback(() => {
@@ -315,5 +440,17 @@ export function useLiveConversation(): UseLiveConversation {
     setStatus("listening");
   }, []);
 
-  return { status, durationMs, turns, latestAiCaption, error, start, stop, cancel, pause, resume };
+  return {
+    status,
+    durationMs,
+    turns,
+    latestAiCaption,
+    error,
+    crisisIntercept,
+    start,
+    stop,
+    cancel,
+    pause,
+    resume,
+  };
 }
