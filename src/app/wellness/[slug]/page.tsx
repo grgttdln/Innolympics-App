@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { BreathingVisualizer } from "@/components/breathing-visualizer";
+import { GroundingBringMeGame } from "@/components/grounding-bring-me-game";
 import { WellnessPageHeader } from "@/components/wellness-page-header";
 import {
   WELLNESS_TECHNIQUES,
@@ -31,6 +32,8 @@ export default async function WellnessTechniquePage({
         ? "circle"
         : null;
 
+  const showGroundingGame = technique.slug === "bring-me";
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
       <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden rounded-[40px] bg-[#FCFAF7]">
@@ -49,7 +52,9 @@ export default async function WellnessTechniquePage({
             {technique.description}
           </p>
 
-          {visualizerMode ? (
+          {showGroundingGame ? (
+            <GroundingBringMeGame />
+          ) : visualizerMode ? (
             <div className="flex flex-1 items-center justify-center pt-4">
               <BreathingVisualizer mode={visualizerMode} />
             </div>

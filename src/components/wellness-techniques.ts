@@ -18,12 +18,20 @@ export const WELLNESS_TECHNIQUES: readonly WellnessTechnique[] = [
     variant: "dark",
   },
   {
+    slug: "bring-me",
+    badge: "GROUNDING",
+    title: "Visual Grounding Task",
+    description: "Find simple objects and refocus your attention.",
+    duration: "2 min",
+    variant: "plum",
+  },
+  {
     slug: "grounding",
     badge: "GROUNDING",
     title: "5-4-3-2-1, find your now.",
     description: "Anchor your senses gently.",
     duration: "3 min",
-    variant: "plum",
+    variant: "lavender",
   },
 ];
 
