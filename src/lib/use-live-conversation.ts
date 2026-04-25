@@ -12,7 +12,6 @@ import { createPcmPlaybackQueue, type PcmPlaybackQueue } from "./pcm-playback-qu
 import type { Turn } from "./turns-store";
 import { scanForCrisis } from "@/lib/safety/crisis-scanner";
 import { VOICE_UNIFIED_PROMPT } from "@/lib/agents/prompts/voice-unified";
-import { VOICE_TOOLS } from "@/lib/agents/voice-tools";
 import { CRISIS_INTERCEPT_PH } from "@/lib/safety/crisis-templates";
 
 export type LiveStatus =
@@ -53,14 +52,9 @@ export type UseLiveConversation = {
 
 type TokenResponse = { token: string; model: string };
 
-/** Max time we wait for a backend memory route before telling Gemini "empty". */
-const TOOL_CALL_TIMEOUT_MS = 300;
-
-/** After turnComplete, how long we give the async /api/journal POST. */
-const JOURNAL_POST_TIMEOUT_MS = 15_000;
-
 type UseLiveConversationOptions = {
-  /** Integer user id from `loadUser()`. Required for memory + backend writes. */
+  /** Integer user id from `loadUser()`. Required so the client-side crisis
+   *  interceptor can log escalation events against the right account. */
   userId: number | null;
 };
 
@@ -93,7 +87,6 @@ export function useLiveConversation(
   const userIdRef = useRef<number | null>(userId);
   const elevatedCautionRef = useRef(false);
   const crisisInterceptedRef = useRef(false);
-  const pendingEscalationRef = useRef<string | null>(null);
 
   // Keep userIdRef in sync so mid-session session changes don't break writes.
   useEffect(() => {
@@ -151,98 +144,6 @@ export function useLiveConversation(
   useEffect(() => () => teardown(), [teardown]);
 
   /**
-   * Fetch a single tool-call target with a hard timeout. On any failure
-   * we resolve to a safe empty payload so the voice turn never stalls.
-   */
-  const callMemoryRoute = useCallback(
-    async (
-      path: "/api/memory/search" | "/api/memory/log-mood",
-      body: Record<string, unknown>,
-    ): Promise<Record<string, unknown>> => {
-      const uid = userIdRef.current;
-      if (uid === null) {
-        return path.endsWith("search")
-          ? { entries: [] }
-          : { status: "error" };
-      }
-      const controller = new AbortController();
-      const timer = window.setTimeout(
-        () => controller.abort(),
-        TOOL_CALL_TIMEOUT_MS,
-      );
-      try {
-        const res = await fetch(path, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": String(uid),
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return (await res.json()) as Record<string, unknown>;
-      } catch (err) {
-        console.warn(`[live] ${path} failed or timed out`, err);
-        return path.endsWith("search")
-          ? { entries: [] }
-          : { status: "error" };
-      } finally {
-        window.clearTimeout(timer);
-      }
-    },
-    [],
-  );
-
-  const handleToolCall = useCallback(
-    async (msg: LiveServerMessage) => {
-      const calls = msg.toolCall?.functionCalls;
-      if (!calls || calls.length === 0) return;
-
-      const responses = await Promise.all(
-        calls.map(async (fc) => {
-          const args = (fc.args ?? {}) as Record<string, unknown>;
-          let response: Record<string, unknown>;
-          if (fc.name === "get_journal_context") {
-            const query =
-              typeof args.query === "string" ? args.query : "";
-            response = await callMemoryRoute("/api/memory/search", {
-              query,
-            });
-          } else if (fc.name === "log_mood_score") {
-            const mood_score =
-              typeof args.mood_score === "number" ? args.mood_score : 0;
-            const emotions = Array.isArray(args.emotions)
-              ? (args.emotions as unknown[]).filter(
-                  (v): v is string => typeof v === "string",
-                )
-              : [];
-            response = await callMemoryRoute("/api/memory/log-mood", {
-              mood_score,
-              emotions,
-            });
-          } else {
-            response = { error: `unknown tool ${fc.name}` };
-          }
-
-          return {
-            id: fc.id,
-            name: fc.name,
-            response,
-          };
-        }),
-      );
-
-      try {
-        sessionRef.current?.sendToolResponse({ functionResponses: responses });
-      } catch (err) {
-        console.warn("[live] sendToolResponse failed", err);
-      }
-    },
-    [callMemoryRoute],
-  );
-
-  /**
    * Client-side crisis interceptor. Runs on every input transcription
    * chunk; on a positive hit it stops audio playback, logs an escalation
    * event to the backend, and raises session-wide elevatedCaution so the
@@ -290,56 +191,8 @@ export function useLiveConversation(
     }
   }, []);
 
-  /**
-   * Fire-and-forget POST to /api/journal after a user turn completes.
-   * Runs the full LangGraph pipeline in the background so memory,
-   * mood trend, and escalation all stay in sync across modes.
-   */
-  const postTurnToBackend = useCallback((transcript: string) => {
-    const uid = userIdRef.current;
-    if (uid === null || transcript.trim().length === 0) return;
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(
-      () => controller.abort(),
-      JOURNAL_POST_TIMEOUT_MS,
-    );
-    fetch("/api/journal", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": String(uid),
-      },
-      body: JSON.stringify({ transcript, input_type: "voice" }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          needs_escalation?: boolean;
-          intent?: string;
-        };
-        if (data.needs_escalation) {
-          pendingEscalationRef.current =
-            "Your recent entries suggest a downward trend. Please gently check in with the user, and remind them that professional support is available.";
-        }
-      })
-      .catch((err) => {
-        if (err?.name !== "AbortError") {
-          console.warn("[live] /api/journal async write failed", err);
-        }
-      })
-      .finally(() => window.clearTimeout(timer));
-  }, []);
-
   const handleServerMessage = useCallback(
     (msg: LiveServerMessage) => {
-      // Handle tool calls (they're not wrapped in serverContent).
-      if (msg.toolCall) {
-        void handleToolCall(msg);
-        return;
-      }
-
       const sc = msg.serverContent;
       if (!sc) return;
 
@@ -369,37 +222,10 @@ export function useLiveConversation(
       }
 
       if (sc.generationComplete || sc.turnComplete) {
-        // Snapshot the user transcript *before* flushUserTurn clears the
-        // buffer, so we can fire the async POST against the right text.
-        const userText = userBufferRef.current.trim();
-
         flushUserTurn();
         // Save the AI turn to history but KEEP the text buffer alive so
         // the caption ticker can keep revealing words while audio plays.
         flushAiTurn(false);
-
-        // Fire-and-forget backend run of the LangGraph pipeline. Never
-        // awaited — the voice loop must stay real-time. Skipped when
-        // the client-side crisis scanner already owns the turn.
-        if (userText.length > 0 && !crisisInterceptedRef.current) {
-          postTurnToBackend(userText);
-        }
-
-        // If a prior turn surfaced a backend-detected escalation, hand
-        // the context to the model via clientContent so the next turn
-        // is informed. Cleared immediately so we don't double-deliver.
-        const pending = pendingEscalationRef.current;
-        if (pending) {
-          pendingEscalationRef.current = null;
-          try {
-            sessionRef.current?.sendClientContent({
-              turns: [{ role: "user", parts: [{ text: `[system] ${pending}` }] }],
-              turnComplete: false,
-            });
-          } catch (err) {
-            console.warn("[live] pending escalation inject failed", err);
-          }
-        }
 
         const finishTurn = () => {
           // Briefly show the full caption once audio finishes so the last
@@ -419,13 +245,7 @@ export function useLiveConversation(
 
       if (sc.interrupted) playbackRef.current?.clear();
     },
-    [
-      checkCrisisAndIntercept,
-      flushAiTurn,
-      flushUserTurn,
-      handleToolCall,
-      postTurnToBackend,
-    ],
+    [checkCrisisAndIntercept, flushAiTurn, flushUserTurn],
   );
 
   const start = useCallback(async () => {
@@ -451,7 +271,6 @@ export function useLiveConversation(
     setCrisisIntercept(null);
     crisisInterceptedRef.current = false;
     elevatedCautionRef.current = false;
-    pendingEscalationRef.current = null;
 
     let tokenRes: TokenResponse;
     try {
@@ -501,9 +320,12 @@ export function useLiveConversation(
           },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
-          // Phase 3 additions on top:
+          // The system prompt steers persona, tone, and crisis protocol.
+          // We deliberately don't register tools here — during the Live
+          // session the AI is a conversational companion, not an analyst.
+          // Memory retrieval + classification + escalation run server-side
+          // against the *full* transcript when the user hits Save.
           systemInstruction: VOICE_UNIFIED_PROMPT,
-          tools: [{ functionDeclarations: VOICE_TOOLS }],
         },
         callbacks: {
           onopen: () => console.log("[live] socket open"),
@@ -600,7 +422,6 @@ export function useLiveConversation(
     setCrisisIntercept(null);
     crisisInterceptedRef.current = false;
     elevatedCautionRef.current = false;
-    pendingEscalationRef.current = null;
   }, [teardown]);
 
   const pause = useCallback(() => {
