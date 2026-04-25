@@ -24,7 +24,7 @@ const BARS: Bar[] = Array.from({ length: BAR_COUNT }, (_, i) => {
   return {
     x: (i - centerIdx) * BAR_SPACING,
     h: 16 + envelope * 56,
-    delay: Math.abs(i - centerIdx) * 0.05,
+    delay: 0,
   };
 });
 
