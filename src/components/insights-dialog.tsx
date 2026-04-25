@@ -2,7 +2,7 @@
 
 import type { RefObject } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { X, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import {
   AiResponseCard,
@@ -51,24 +51,16 @@ export function InsightsDialog({
             "focus-visible:outline-none",
           ].join(" ")}
         >
-          <header className="relative flex items-center justify-center border-b border-[#EFE8E0] px-5 py-4">
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#A881C2]"
-              >
-                <Sparkles className="h-3 w-3 text-white" strokeWidth={2} />
-              </span>
-              <Dialog.Title className="text-[14px] font-semibold tracking-[-0.2px] text-[#1A1A1A]">
-                Reflective insights
-              </Dialog.Title>
-            </div>
-            <Dialog.Close
-              aria-label="Close insights"
-              className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-[#6B6259] transition-colors duration-200 hover:bg-[#F2EEE9] hover:text-[#1A1A1A] focus-visible:bg-[#F2EEE9] focus-visible:text-[#1A1A1A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A881C2] active:opacity-80"
+          <header className="flex items-center justify-center gap-2 border-b border-[#EFE8E0] px-5 py-4">
+            <span
+              aria-hidden
+              className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#A881C2]"
             >
-              <X className="h-4 w-4" strokeWidth={2} />
-            </Dialog.Close>
+              <Sparkles className="h-3 w-3 text-white" strokeWidth={2} />
+            </span>
+            <Dialog.Title className="text-[14px] font-semibold tracking-[-0.2px] text-[#1A1A1A]">
+              Reflective insights
+            </Dialog.Title>
           </header>
 
           <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-5 [scrollbar-color:#D9D2C7_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D9D2C7] [&::-webkit-scrollbar]:w-1.5">
@@ -110,7 +102,7 @@ export function InsightsDialog({
  * soft-lavender chips, matching the FollowUpCard family.
  */
 function EmotionAcknowledgement({ emotions }: { emotions: string[] }) {
-  const visible = emotions.slice(0, 3).map((e) => e.toLowerCase());
+  const visible = emotions.slice(0, 3).map(toTitleCase);
   return (
     <div className="flex flex-col gap-2 rounded-[20px] border border-[#E9DAF2] bg-[#F4EEF9] px-4 py-3">
       <p className="text-[11px] font-bold uppercase tracking-[1px] text-[#5B3D78]">
@@ -128,4 +120,16 @@ function EmotionAcknowledgement({ emotions }: { emotions: string[] }) {
       </div>
     </div>
   );
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((word) =>
+      word.length === 0
+        ? word
+        : word[0].toUpperCase() + word.slice(1).toLowerCase(),
+    )
+    .join(" ");
 }
