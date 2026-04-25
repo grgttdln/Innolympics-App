@@ -74,12 +74,41 @@ export default function VoiceJournalPage() {
     router.push("/dashboard");
   }
 
+  const eyebrow =
+    live.status === "idle"
+      ? "VOICE JOURNAL"
+      : live.status === "connecting"
+      ? "PREPARING"
+      : live.status === "listening"
+      ? "LISTENING"
+      : live.status === "speaking"
+      ? "SPEAKING"
+      : live.status === "paused"
+      ? "PAUSED"
+      : "";
+
+  const idleCaption = "Tap record when you're ready.\nI'll listen and ask gentle questions.";
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-100">
+    <main className="flex min-h-screen items-center justify-center bg-[#F4F2ED]">
       <div
         ref={frameRef}
-        className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white"
+        className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-[#FBFAF6]"
       >
+        {/* Ambient radial wash */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 transition-opacity duration-[1200ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
+          style={{
+            background:
+              live.status === "speaking"
+                ? "radial-gradient(70% 55% at 50% 38%, rgba(245,166,35,0.14) 0%, rgba(245,166,35,0) 70%)"
+                : live.status === "listening"
+                ? "radial-gradient(70% 55% at 50% 38%, rgba(139,92,246,0.14) 0%, rgba(139,92,246,0) 70%)"
+                : "radial-gradient(70% 55% at 50% 38%, rgba(139,92,246,0.06) 0%, rgba(139,92,246,0) 70%)",
+          }}
+        />
+
         <div className="h-[62px] shrink-0" aria-hidden />
 
         {live.status === "error" ? (
@@ -89,32 +118,42 @@ export default function VoiceJournalPage() {
             onBack={() => router.push("/dashboard")}
           />
         ) : (
-          <div className="flex flex-1 flex-col px-6">
+          <div className="relative flex flex-1 flex-col px-6">
             <RecordingHeader status={uiStatus} onClose={handleRequestExit} />
 
-            <div className="mt-16 flex justify-center">
+            <div
+              aria-hidden
+              className="mt-10 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-[#8A8A8A]"
+            >
+              {eyebrow}
+            </div>
+
+            <div className="mt-6 flex justify-center">
               <LiveOrb status={live.status} />
             </div>
 
             <p
-              className="mx-auto mt-6 max-w-[320px] min-h-[48px] text-center text-[17px] leading-[24px] text-[#1A1A1A]"
+              className="mx-auto mt-6 max-w-[300px] min-h-[56px] whitespace-pre-line text-center text-[16px] font-medium leading-[22px] tracking-[-0.2px] text-[#1A1A1A] transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
               aria-live="polite"
             >
-              {live.latestAiCaption}
+              {live.latestAiCaption || (live.status === "idle" ? idleCaption : "")}
             </p>
 
             <div className="flex-1" />
 
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[13px] text-[#8A8A8A]">
-                {formatDuration(live.durationMs)}
-              </span>
-              <span className="text-[13px] text-[#8A8A8A]">
-                {live.turns.length} turn{live.turns.length === 1 ? "" : "s"}
-              </span>
+            <div className="mb-5 flex items-center justify-center">
+              <div className="inline-flex items-center gap-3 rounded-full bg-white/60 px-4 py-[7px] ring-1 ring-black/[0.04] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_2px_10px_rgba(17,12,46,0.04)] backdrop-blur-[2px]">
+                <span className="font-mono text-[12px] tabular-nums tracking-[0.02em] text-[#1A1A1A]">
+                  {formatDuration(live.durationMs)}
+                </span>
+                <span className="h-3 w-px bg-black/10" aria-hidden />
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#8A8A8A]">
+                  {live.turns.length} turn{live.turns.length === 1 ? "" : "s"}
+                </span>
+              </div>
             </div>
 
-            <div className="mb-8">
+            <div className="mb-10">
               <RecordingControls
                 status={uiStatus}
                 onStart={() => void live.start()}
