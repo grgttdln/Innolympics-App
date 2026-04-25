@@ -1,18 +1,15 @@
 import Link from "next/link";
-import { ArrowRight, Mic, PenLine, Timer } from "lucide-react";
+import { ArrowUpRight, Calendar, Mic, PenLine, ShieldCheck } from "lucide-react";
 
 type Mode = {
   href: string;
   icon: typeof Mic;
   title: string;
   description: string;
-  duration: string;
   card: string;
   iconWrap: string;
   accent: string;
-  descColor: string;
-  metaColor: string;
-  ctaBg: string;
+  hoverRing: string;
 };
 
 const MODES: readonly Mode[] = [
@@ -20,57 +17,73 @@ const MODES: readonly Mode[] = [
     href: "/journal/voice",
     icon: Mic,
     title: "Voice",
-    description: "Speak freely, we'll transcribe it.",
-    duration: "1–3 min",
-    card: "bg-[#A881C2] ring-[1.5px] ring-inset ring-[#FCFAF7]/50",
-    iconWrap: "bg-[#FCFAF7]",
-    accent: "text-[#5B3D78]",
-    descColor: "text-white/80",
-    metaColor: "text-white/80",
-    ctaBg: "bg-white",
+    description: "Speak freely — we'll transcribe it",
+    card: "bg-[#A881C2]",
+    iconWrap: "bg-white/[0.15]",
+    accent: "text-white/80",
+    hoverRing: "hover:ring-[#FCFAF7] active:ring-[#FCFAF7] focus-visible:ring-[#FCFAF7]",
   },
   {
     href: "/journal/text",
     icon: PenLine,
     title: "Text",
-    description: "Write it out, at your own pace.",
-    duration: "2–5 min",
-    card: "bg-[#2A2A2A] ring-1 ring-inset ring-white/10",
-    iconWrap: "bg-white/[0.07]",
-    accent: "text-[#FCFAF7]",
-    descColor: "text-[#B8B0A7]",
-    metaColor: "text-[#B8B0A7]",
-    ctaBg: "bg-white/[0.07]",
+    description: "Write it down in your own words",
+    card: "bg-[#1A1A1A]",
+    iconWrap: "bg-white/[0.10]",
+    accent: "text-white/80",
+    hoverRing: "hover:ring-[#A881C2] active:ring-[#A881C2] focus-visible:ring-[#A881C2]",
   },
 ];
 
-const HIGHLIGHT =
-  "hover:shadow-[0_0_0_2px_#A881C2] active:shadow-[0_0_0_2px_#A881C2] focus-visible:shadow-[0_0_0_2px_#A881C2] focus-visible:outline-none";
-
-export function JournalPicker() {
+export function JournalPicker({ date = new Date() }: { date?: Date } = {}) {
   return (
     <section
       aria-labelledby="journal-picker-heading"
-      className="flex flex-col gap-4 rounded-[24px] bg-[#1A1A1A] p-5"
+      className="flex flex-1 flex-col justify-between gap-6 rounded-[28px] bg-white px-[22px] py-[26px]"
     >
-      <div className="flex flex-col gap-1.5">
-        <h2
-          id="journal-picker-heading"
-          className="text-[22px] font-bold leading-[1.2] tracking-[-0.3px] text-[#FCFAF7]"
-        >
-          Tell me what&apos;s on your mind.
-        </h2>
-        <p className="text-[13px] leading-[1.3] text-[#B8B0A7]">
-          Choose how you&apos;d like to journal today.
-        </p>
+      <div className="flex flex-col gap-6">
+        <DateChip date={date} />
+
+        <div className="flex flex-col gap-3">
+          <h2
+            id="journal-picker-heading"
+            className="text-[32px] font-bold leading-[1.15] tracking-[-1px] text-[#1A1A1A]"
+          >
+            Tell me what&apos;s on your mind.
+          </h2>
+          <p className="text-[15px] leading-[1.5] text-[#6B6259]">
+            Take a moment to check in with yourself. No judgment — just presence, your way.
+          </p>
+        </div>
+
+        <ul className="flex flex-col gap-3.5">
+          {MODES.map((mode) => (
+            <ModeCard key={mode.href} mode={mode} />
+          ))}
+        </ul>
       </div>
 
-      <ul className="grid grid-cols-2 gap-3">
-        {MODES.map((mode) => (
-          <ModeCard key={mode.href} mode={mode} />
-        ))}
-      </ul>
+      <p className="flex items-center justify-center gap-1.5 pt-2 text-[11px] font-medium text-[#B8B0A7]">
+        <ShieldCheck className="h-3 w-3" strokeWidth={1.75} aria-hidden />
+        Private — only you can see this
+      </p>
     </section>
+  );
+}
+
+function DateChip({ date }: { date: Date }) {
+  const formatted = date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const [weekday, month] = formatted.split(", ");
+
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.4px] text-[#B8B0A7]">
+      <Calendar className="h-3 w-3" strokeWidth={1.75} aria-hidden />
+      {weekday} • {month}
+    </span>
   );
 }
 
@@ -81,38 +94,29 @@ function ModeCard({ mode }: { mode: Mode }) {
     <li>
       <Link
         href={mode.href}
-        className={`group flex cursor-pointer flex-col gap-4 rounded-[18px] p-4 transition-shadow duration-200 ${HIGHLIGHT} ${mode.card}`}
+        className={`group flex cursor-pointer items-center gap-[18px] rounded-[22px] px-[22px] py-[26px] ring-2 ring-inset ring-transparent transition-shadow duration-200 focus-visible:outline-none ${mode.hoverRing} ${mode.card}`}
       >
         <span
           aria-hidden
-          className={`flex h-11 w-11 items-center justify-center rounded-full ${mode.iconWrap} ${mode.accent}`}
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${mode.iconWrap}`}
         >
-          <Icon className="h-[22px] w-[22px]" strokeWidth={1.75} />
+          <Icon className="h-[26px] w-[26px] text-white" strokeWidth={1.75} />
         </span>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-[16px] font-bold leading-[1.2] tracking-[-0.2px] text-white">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <span className="text-[22px] font-bold leading-[1.15] tracking-[-0.4px] text-white">
             {mode.title}
           </span>
-          <span className={`text-[11px] leading-[1.35] ${mode.descColor}`}>
+          <span className={`text-[13px] font-medium leading-snug ${mode.accent}`}>
             {mode.description}
           </span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <span
-            className={`flex items-center gap-[5px] text-[11px] font-medium leading-none ${mode.metaColor}`}
-          >
-            <Timer className="h-[11px] w-[11px]" strokeWidth={1.75} />
-            {mode.duration}
-          </span>
-          <span
-            aria-hidden
-            className={`flex h-7 w-7 items-center justify-center rounded-full transition-transform group-hover:translate-x-0.5 ${mode.ctaBg} ${mode.accent}`}
-          >
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-          </span>
-        </div>
+        <ArrowUpRight
+          className="h-[18px] w-[18px] shrink-0 text-white transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          strokeWidth={1.75}
+          aria-hidden
+        />
       </Link>
     </li>
   );

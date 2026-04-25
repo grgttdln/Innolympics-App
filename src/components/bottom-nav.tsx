@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NotebookPen, User, Users } from "lucide-react";
+import { HeartPulse, NotebookPen, User } from "lucide-react";
 
 type NavItem = {
   href: string;
-  icon: typeof Users;
+  icon: typeof HeartPulse;
   label: string;
 };
 
 const SIDE_ITEMS: readonly [NavItem, NavItem] = [
-  { href: "/community", icon: Users, label: "Community" },
+  { href: "/wellness", icon: HeartPulse, label: "Wellness" },
   { href: "/profile", icon: User, label: "Profile" },
 ];
 

@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { JournalPicker } from "@/components/journal-picker";
-import { WellnessTips } from "@/components/wellness-tips";
 import { loadUser, type StoredUser } from "@/lib/session";
 
 export default function DashboardPage() {
@@ -24,12 +23,11 @@ export default function DashboardPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-      <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-white">
-        <div className="h-[62px] shrink-0" aria-hidden />
+      <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-[#FCFAF7]">
+        <div className="h-[54px] shrink-0" aria-hidden />
 
-        <div className="flex flex-1 flex-col gap-8 px-6 pb-32">
+        <div className="flex flex-1 flex-col gap-4 px-5 pb-32 pt-2">
           {user ? <DashboardHeader name={user.name} /> : null}
-          <WellnessTips />
           <JournalPicker />
         </div>
 
