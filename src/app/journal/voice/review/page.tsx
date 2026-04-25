@@ -119,31 +119,29 @@ function VoiceReviewPageInner() {
 }
 
 function renderGroupedTurns(turns: TurnsRecord["turns"]) {
-  type Group = { heading: string | null; body: string };
-  const groups: Group[] = [];
-  let pendingHeading: string | null = null;
-  let currentBody: string | null = null;
-
-  for (const t of turns) {
-    if (t.role === "ai") {
-      if (currentBody !== null) {
-        groups.push({ heading: pendingHeading, body: currentBody });
-        currentBody = null;
-        pendingHeading = null;
-      }
-      pendingHeading = pendingHeading ? `${pendingHeading} ${t.text}` : t.text;
-    } else {
-      currentBody = currentBody ? `${currentBody} ${t.text}` : t.text;
-    }
-  }
-  if (currentBody !== null) {
-    groups.push({ heading: pendingHeading, body: currentBody });
-  } else if (pendingHeading !== null) {
-    groups.push({ heading: null, body: pendingHeading });
-  }
-
-  if (groups.length === 0) {
+  if (turns.length === 0) {
     return <p className="text-[14px] text-[#8A8A8A]">(No conversation recorded.)</p>;
+  }
+
+  // Merge consecutive same-role turns into runs, then pair AI run with following user run.
+  const runs: { role: "user" | "ai"; text: string }[] = [];
+  for (const t of turns) {
+    const last = runs[runs.length - 1];
+    if (last && last.role === t.role) last.text += ` ${t.text}`;
+    else runs.push({ role: t.role, text: t.text });
+  }
+
+  const groups: { heading: string | null; body: string }[] = [];
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    if (r.role === "user") {
+      groups.push({ heading: null, body: r.text });
+    } else if (i + 1 < runs.length && runs[i + 1].role === "user") {
+      groups.push({ heading: r.text, body: runs[i + 1].text });
+      i++;
+    } else {
+      groups.push({ heading: null, body: r.text });
+    }
   }
 
   return groups.map((g, i) => (

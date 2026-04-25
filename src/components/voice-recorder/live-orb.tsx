@@ -4,23 +4,21 @@ import { cn } from "@/lib/utils";
 import type { LiveStatus } from "@/lib/use-live-conversation";
 
 export function LiveOrb({ status }: { status: LiveStatus }) {
-  const speaking = status === "speaking";
-  const listening = status === "listening";
-  const thinking = status === "thinking" || status === "connecting";
+  const color =
+    status === "speaking"
+      ? "bg-[#F5A623]"
+      : status === "listening"
+      ? "bg-[#8B5CF6]"
+      : "bg-[#CFC9BE]";
 
-  const color = speaking
-    ? "bg-[#F5A623]"
-    : listening
-    ? "bg-[#8B5CF6]"
-    : "bg-[#CFC9BE]";
-
-  const pulse = speaking
-    ? "animate-[live-orb-fast_0.9s_ease-in-out_infinite]"
-    : listening
-    ? "animate-[live-orb-slow_2.2s_ease-in-out_infinite]"
-    : thinking
-    ? "animate-pulse"
-    : "";
+  const pulse =
+    status === "speaking"
+      ? "animate-[live-orb-fast_0.9s_ease-in-out_infinite]"
+      : status === "listening"
+      ? "animate-[live-orb-slow_2.2s_ease-in-out_infinite]"
+      : status === "connecting"
+      ? "animate-pulse"
+      : "";
 
   return (
     <div className="relative flex h-[220px] w-[220px] items-center justify-center">

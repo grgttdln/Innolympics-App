@@ -1,14 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  GoogleGenAI,
-  MediaResolution,
-  Modality,
-  type LiveServerMessage,
-  type Session,
-} from "@google/genai";
-import { LIVE_SYSTEM_PROMPT } from "./live-system-prompt";
+import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
 import { createPcmPlaybackQueue, type PcmPlaybackQueue } from "./pcm-playback-queue";
 import type { Turn } from "./turns-store";
 
@@ -16,7 +9,6 @@ export type LiveStatus =
   | "idle"
   | "connecting"
   | "listening"
-  | "thinking"
   | "speaking"
   | "paused"
   | "error";
@@ -43,20 +35,6 @@ export type UseLiveConversation = {
 
 type TokenResponse = { token: string; model: string };
 
-function base64ToInt16(base64: string): Int16Array {
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
-}
-
-function int16ToBase64(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
 export function useLiveConversation(): UseLiveConversation {
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [durationMs, setDurationMs] = useState(0);
@@ -75,7 +53,6 @@ export function useLiveConversation(): UseLiveConversation {
   const aiBufferRef = useRef("");
   const turnsRef = useRef<Turn[]>([]);
   const aliveRef = useRef(false);
-  const startedRef = useRef(false);
   const pausedRef = useRef(false);
 
   const pushTurn = useCallback((turn: Turn) => {
@@ -97,51 +74,32 @@ export function useLiveConversation(): UseLiveConversation {
 
   const teardown = useCallback(() => {
     aliveRef.current = false;
-    startedRef.current = false;
     pausedRef.current = false;
     if (tickRef.current !== null) {
-      cancelAnimationFrame(tickRef.current);
+      clearInterval(tickRef.current);
       tickRef.current = null;
     }
     if (workletNodeRef.current) {
       workletNodeRef.current.port.onmessage = null;
-      try {
-        workletNodeRef.current.disconnect();
-      } catch {}
+      workletNodeRef.current.disconnect();
       workletNodeRef.current = null;
     }
-    if (captureCtxRef.current) {
-      captureCtxRef.current.close().catch(() => {});
-      captureCtxRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (playbackRef.current) {
-      playbackRef.current.close();
-      playbackRef.current = null;
-    }
-    if (sessionRef.current) {
-      try {
-        sessionRef.current.close();
-      } catch {}
-      sessionRef.current = null;
-    }
+    captureCtxRef.current?.close().catch(() => {});
+    captureCtxRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    playbackRef.current?.close();
+    playbackRef.current = null;
+    sessionRef.current?.close();
+    sessionRef.current = null;
     userBufferRef.current = "";
     aiBufferRef.current = "";
   }, []);
 
   useEffect(() => () => teardown(), [teardown]);
 
-  const tick = useCallback(() => {
-    setDurationMs(Date.now() - startedAtRef.current);
-    tickRef.current = requestAnimationFrame(tick);
-  }, []);
-
   const handleServerMessage = useCallback(
     (msg: LiveServerMessage) => {
-      if (!aliveRef.current) return;
       const sc = msg.serverContent;
       if (!sc) return;
 
@@ -153,11 +111,13 @@ export function useLiveConversation(): UseLiveConversation {
         setLatestAiCaption(aiBufferRef.current.trim());
       }
 
-      const modelParts = sc.modelTurn?.parts ?? [];
-      for (const part of modelParts) {
+      for (const part of sc.modelTurn?.parts ?? []) {
         const inline = part.inlineData;
         if (inline?.data && inline.mimeType?.startsWith("audio/pcm")) {
-          const pcm = base64ToInt16(inline.data);
+          const bin = atob(inline.data);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
           playbackRef.current?.enqueue(pcm);
           setStatus("speaking");
         }
@@ -166,16 +126,14 @@ export function useLiveConversation(): UseLiveConversation {
       if (sc.generationComplete || sc.turnComplete) {
         flushUserTurn();
         flushAiTurn();
-        if (!playbackRef.current?.isPlaying()) {
-          setStatus("listening");
-        } else {
+        if (playbackRef.current?.isPlaying()) {
           playbackRef.current.onIdle(() => setStatus("listening"));
+        } else {
+          setStatus("listening");
         }
       }
 
-      if (sc.interrupted) {
-        playbackRef.current?.clear();
-      }
+      if (sc.interrupted) playbackRef.current?.clear();
     },
     [flushAiTurn, flushUserTurn],
   );
@@ -187,9 +145,7 @@ export function useLiveConversation(): UseLiveConversation {
       setStatus("error");
       return;
     }
-
-    if (startedRef.current) return;
-    startedRef.current = true;
+    if (aliveRef.current) return;
     aliveRef.current = true;
 
     setError(null);
@@ -206,60 +162,29 @@ export function useLiveConversation(): UseLiveConversation {
     } catch {
       setError("token-failed");
       setStatus("error");
+      aliveRef.current = false;
       return;
     }
 
-    if (!aliveRef.current) {
-      teardown();
-      return;
-    }
-
-    let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
       const name = (err as { name?: string })?.name;
-      setError(
-        name === "NotAllowedError" || name === "SecurityError"
-          ? "mic-denied"
-          : "mic-unavailable",
-      );
+      setError(name === "NotAllowedError" || name === "SecurityError" ? "mic-denied" : "mic-unavailable");
       setStatus("error");
-      return;
-    }
-
-    if (!aliveRef.current) {
-      teardown();
+      aliveRef.current = false;
       return;
     }
 
     try {
       playbackRef.current = createPcmPlaybackQueue(24000);
 
-      const ai = new GoogleGenAI({ apiKey: tokenRes.token, apiVersion: "v1alpha" });
+      const ai = new GoogleGenAI({ apiKey: tokenRes.token });
       const session = await ai.live.connect({
         model: tokenRes.model,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: "Zephyr" },
-            },
-          },
-          contextWindowCompression: {
-            triggerTokens: "104857",
-            slidingWindow: { targetTokens: "52428" },
-          },
-          systemInstruction: LIVE_SYSTEM_PROMPT,
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-        },
+        config: { responseModalities: [Modality.AUDIO] },
         callbacks: {
-          onopen: () => {
-            console.log("[live] socket open");
-          },
+          onopen: () => console.log("[live] socket open"),
           onmessage: handleServerMessage,
           onerror: (e) => {
             console.error("[live] socket error", e);
@@ -279,11 +204,6 @@ export function useLiveConversation(): UseLiveConversation {
       });
       sessionRef.current = session;
 
-      if (!aliveRef.current) {
-        teardown();
-        return;
-      }
-
       const AudioCtx =
         window.AudioContext ??
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -291,34 +211,34 @@ export function useLiveConversation(): UseLiveConversation {
       captureCtxRef.current = captureCtx;
       await captureCtx.audioWorklet.addModule("/audio-worklets/pcm-processor.js");
 
-      if (!aliveRef.current) {
-        teardown();
-        return;
-      }
-      const source = captureCtx.createMediaStreamSource(stream);
+      const source = captureCtx.createMediaStreamSource(streamRef.current);
       const node = new AudioWorkletNode(captureCtx, "pcm-processor");
       workletNodeRef.current = node;
       source.connect(node);
       node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
         if (pausedRef.current) return;
-        const data = int16ToBase64(e.data);
+        const bytes = new Uint8Array(e.data);
+        let bin = "";
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
         sessionRef.current?.sendRealtimeInput({
-          audio: { data, mimeType: "audio/pcm;rate=16000" },
+          audio: { data: btoa(bin), mimeType: "audio/pcm;rate=16000" },
         });
       };
 
       startedAtRef.current = Date.now();
       setDurationMs(0);
-      tickRef.current = requestAnimationFrame(tick);
+      tickRef.current = window.setInterval(
+        () => setDurationMs(Date.now() - startedAtRef.current),
+        1000,
+      );
       setStatus("listening");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "socket failed";
-      console.error("live-conversation connect failed:", message);
+      console.error("[live] connect failed:", err);
       setError("socket-failed");
       setStatus("error");
       teardown();
     }
-  }, [handleServerMessage, teardown, tick]);
+  }, [handleServerMessage, teardown]);
 
   const stop = useCallback(async (): Promise<Turn[]> => {
     flushUserTurn();
@@ -342,9 +262,7 @@ export function useLiveConversation(): UseLiveConversation {
   const pause = useCallback(() => {
     if (!aliveRef.current) return;
     pausedRef.current = true;
-    try {
-      sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true });
-    } catch {}
+    sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true });
     streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
     playbackRef.current?.clear();
     setStatus("paused");

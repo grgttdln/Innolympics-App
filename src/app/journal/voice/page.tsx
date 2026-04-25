@@ -9,7 +9,6 @@ import { RecordingHeader } from "@/components/voice-recorder/recording-header";
 import { DiscardConfirmSheet } from "@/components/voice-recorder/discard-confirm-sheet";
 import { LiveStatusPill } from "@/components/voice-recorder/live-status-pill";
 import { LiveOrb } from "@/components/voice-recorder/live-orb";
-import { LiveCaption } from "@/components/voice-recorder/live-caption";
 import { RecordingControls } from "@/components/voice-recorder/recording-controls";
 
 function formatDuration(ms: number): string {
@@ -19,13 +18,27 @@ function formatDuration(ms: number): string {
   return `${m}:${s}`;
 }
 
+const ERROR_MESSAGES: Record<LiveError, string> = {
+  "mic-denied": "We need mic access to start the conversation.",
+  "mic-unavailable": "No microphone found on this device.",
+  unsupported: "Your browser doesn't support live audio.",
+  "token-failed": "Couldn't start the live session. Please try again.",
+  "socket-failed": "The live session disconnected. Please try again.",
+};
+
 export default function VoiceJournalPage() {
   const router = useRouter();
   const live = useLiveConversation();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
-  const active = live.status !== "idle" && live.status !== "error";
+  const uiStatus: "idle" | "recording" | "paused" =
+    live.status === "idle"
+      ? "idle"
+      : live.status === "paused"
+      ? "paused"
+      : "recording";
+  const active = uiStatus !== "idle";
 
   useEffect(() => {
     if (!active) return;
@@ -37,16 +50,6 @@ export default function VoiceJournalPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [active]);
 
-  const headerStatus: "idle" | "recording" | "paused" =
-    live.status === "paused" ? "paused" : active ? "recording" : "idle";
-
-  const controlsStatus: "idle" | "recording" | "paused" =
-    live.status === "idle"
-      ? "idle"
-      : live.status === "paused"
-      ? "paused"
-      : "recording";
-
   async function handleStop() {
     const turns = await live.stop();
     if (turns.length === 0) {
@@ -55,12 +58,7 @@ export default function VoiceJournalPage() {
     }
     const id = crypto.randomUUID();
     try {
-      await putTurns({
-        id,
-        turns,
-        durationMs: live.durationMs,
-        createdAt: Date.now(),
-      });
+      await putTurns({ id, turns, durationMs: live.durationMs, createdAt: Date.now() });
       router.push(`/journal/voice/review?id=${id}`);
     } catch {
       alert("Couldn't save the conversation. Please try again.");
@@ -68,11 +66,8 @@ export default function VoiceJournalPage() {
   }
 
   function handleRequestExit() {
-    if (active) {
-      setConfirmOpen(true);
-    } else {
-      router.push("/dashboard");
-    }
+    if (active) setConfirmOpen(true);
+    else router.push("/dashboard");
   }
 
   function handleConfirmDiscard() {
@@ -96,7 +91,7 @@ export default function VoiceJournalPage() {
           />
         ) : (
           <div className="flex flex-1 flex-col px-6">
-            <RecordingHeader status={headerStatus} onClose={handleRequestExit} />
+            <RecordingHeader status={uiStatus} onClose={handleRequestExit} />
 
             <div className="mt-8 flex justify-center">
               <LiveStatusPill status={live.status} />
@@ -106,9 +101,12 @@ export default function VoiceJournalPage() {
               <LiveOrb status={live.status} />
             </div>
 
-            <div className="mt-6">
-              <LiveCaption text={live.latestAiCaption} />
-            </div>
+            <p
+              className="mx-auto mt-6 max-w-[320px] min-h-[48px] text-center text-[17px] leading-[24px] text-[#1A1A1A]"
+              aria-live="polite"
+            >
+              {live.latestAiCaption}
+            </p>
 
             <div className="flex-1" />
 
@@ -123,7 +121,7 @@ export default function VoiceJournalPage() {
 
             <div className="mb-8">
               <RecordingControls
-                status={controlsStatus}
+                status={uiStatus}
                 onStart={() => void live.start()}
                 onPauseToggle={live.status === "paused" ? live.resume : live.pause}
                 onStop={() => void handleStop()}
@@ -153,22 +151,8 @@ function ErrorFallback({
   onRetry: () => void;
   onBack: () => void;
 }) {
-  const canRetry =
-    error === "mic-denied" ||
-    error === "token-failed" ||
-    error === "socket-failed";
-  const message =
-    error === "mic-denied"
-      ? "We need mic access to start the conversation."
-      : error === "mic-unavailable"
-      ? "No microphone found on this device."
-      : error === "unsupported"
-      ? "Your browser doesn't support live audio."
-      : error === "token-failed"
-      ? "Couldn't start the live session. Please try again."
-      : error === "socket-failed"
-      ? "The live session disconnected. Please try again."
-      : "Something went wrong. Please try again.";
+  const canRetry = error === "mic-denied" || error === "token-failed" || error === "socket-failed";
+  const message = error ? ERROR_MESSAGES[error] : "Something went wrong. Please try again.";
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">

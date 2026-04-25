@@ -15,11 +15,13 @@ export function createPcmPlaybackQueue(sampleRate = 24000): PcmPlaybackQueue {
   let activeSources: AudioBufferSourceNode[] = [];
   let idleCb: (() => void) | null = null;
 
-  function scheduleIdleCheck() {
-    const now = ctx.currentTime;
-    if (nextStartAt <= now && idleCb) {
-      idleCb();
-    }
+  function stopAll() {
+    activeSources.forEach((s) => {
+      try {
+        s.stop();
+      } catch {}
+    });
+    activeSources = [];
   }
 
   return {
@@ -33,32 +35,25 @@ export function createPcmPlaybackQueue(sampleRate = 24000): PcmPlaybackQueue {
       source.buffer = buffer;
       source.connect(ctx.destination);
 
-      const now = ctx.currentTime;
-      const startAt = Math.max(nextStartAt, now);
+      const startAt = Math.max(nextStartAt, ctx.currentTime);
       source.start(startAt);
       nextStartAt = startAt + buffer.duration;
       activeSources.push(source);
       source.onended = () => {
         activeSources = activeSources.filter((s) => s !== source);
-        scheduleIdleCheck();
+        if (nextStartAt <= ctx.currentTime && idleCb) {
+          const cb = idleCb;
+          idleCb = null;
+          cb();
+        }
       };
     },
     clear() {
-      activeSources.forEach((s) => {
-        try {
-          s.stop();
-        } catch {}
-      });
-      activeSources = [];
+      stopAll();
       nextStartAt = ctx.currentTime;
     },
     close() {
-      activeSources.forEach((s) => {
-        try {
-          s.stop();
-        } catch {}
-      });
-      activeSources = [];
+      stopAll();
       ctx.close().catch(() => {});
     },
     isPlaying() {
