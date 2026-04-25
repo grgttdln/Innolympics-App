@@ -19,14 +19,7 @@ export default function VoiceJournalPage() {
   const router = useRouter();
   const recorder = useAudioRecorder();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const startedRef = useRef(false);
   const frameRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-    void recorder.start();
-  }, [recorder]);
 
   useEffect(() => {
     const active = recorder.status === "recording" || recorder.status === "paused";
@@ -39,8 +32,15 @@ export default function VoiceJournalPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [recorder.status]);
 
+  const idle = recorder.status === "idle";
   const paused = recorder.status === "paused";
   const active = recorder.status === "recording" || recorder.status === "paused";
+
+  const controlsStatus: "idle" | "recording" | "paused" = idle
+    ? "idle"
+    : paused
+    ? "paused"
+    : "recording";
 
   async function handleStop() {
     const blob = await recorder.stop();
@@ -81,7 +81,7 @@ export default function VoiceJournalPage() {
           <ErrorFallback error={recorder.error} onRetry={() => void recorder.start()} onBack={() => router.push("/dashboard")} />
         ) : (
           <div className="flex flex-1 flex-col px-6">
-            <RecordingHeader status={paused ? "paused" : "recording"} onClose={handleRequestExit} />
+            <RecordingHeader status={controlsStatus} onClose={handleRequestExit} />
 
             <div className="mt-10 flex justify-center">
               <LanguagePill language={LANGUAGE} />
@@ -92,18 +92,19 @@ export default function VoiceJournalPage() {
             </div>
 
             <p className="mt-6 text-center text-[14px] text-[#8A8A8A]">
-              {paused ? "Paused" : "Recording in progress"}
+              {idle ? "Ready to record" : paused ? "Paused" : "Recording in progress"}
             </p>
 
             <div className="mt-10">
-              <RecordingWaveform amplitude={recorder.amplitude} paused={paused} />
+              <RecordingWaveform amplitude={recorder.amplitude} paused={!active} />
             </div>
 
             <div className="flex-1" />
 
             <div className="mb-4">
               <RecordingControls
-                paused={paused}
+                status={controlsStatus}
+                onStart={() => void recorder.start()}
                 onPauseToggle={paused ? recorder.resume : recorder.pause}
                 onStop={() => void handleStop()}
                 onCancel={handleRequestExit}
@@ -111,7 +112,7 @@ export default function VoiceJournalPage() {
             </div>
 
             <div className="mb-6">
-              <RecordingHelperText paused={paused} />
+              <RecordingHelperText status={controlsStatus} />
             </div>
           </div>
         )}

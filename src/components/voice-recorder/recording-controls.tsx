@@ -3,16 +3,20 @@
 import { Pause, Play, Trash2 } from "lucide-react";
 
 type Props = {
-  paused: boolean;
+  status: "idle" | "recording" | "paused";
+  onStart: () => void;
   onPauseToggle: () => void;
   onStop: () => void;
   onCancel: () => void;
 };
 
-export function RecordingControls({ paused, onPauseToggle, onStop, onCancel }: Props) {
+export function RecordingControls({ status, onStart, onPauseToggle, onStop, onCancel }: Props) {
+  const idle = status === "idle";
+  const paused = status === "paused";
+
   return (
     <div className="flex items-center justify-center gap-8">
-      <ButtonSlot label={paused ? "Resume" : "Pause"}>
+      <ButtonSlot label={paused ? "Resume" : "Pause"} hidden={idle}>
         <button
           type="button"
           aria-label={paused ? "Resume" : "Pause"}
@@ -27,18 +31,29 @@ export function RecordingControls({ paused, onPauseToggle, onStop, onCancel }: P
         </button>
       </ButtonSlot>
 
-      <ButtonSlot label="Stop">
-        <button
-          type="button"
-          aria-label="Stop"
-          onClick={onStop}
-          className="flex h-[88px] w-[88px] cursor-pointer items-center justify-center rounded-full bg-[#8B5CF6] shadow-md transition-transform active:scale-95"
-        >
-          <span className="h-6 w-6 rounded-[4px] bg-white" aria-hidden />
-        </button>
+      <ButtonSlot label={idle ? "Record" : "Stop"}>
+        {idle ? (
+          <button
+            type="button"
+            aria-label="Start recording"
+            onClick={onStart}
+            className="flex h-[88px] w-[88px] cursor-pointer items-center justify-center rounded-full bg-[#E5484D] shadow-md transition-transform active:scale-95"
+          >
+            <span className="h-5 w-5 rounded-full bg-white" aria-hidden />
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Stop"
+            onClick={onStop}
+            className="flex h-[88px] w-[88px] cursor-pointer items-center justify-center rounded-full bg-[#8B5CF6] shadow-md transition-transform active:scale-95"
+          >
+            <span className="h-6 w-6 rounded-[4px] bg-white" aria-hidden />
+          </button>
+        )}
       </ButtonSlot>
 
-      <ButtonSlot label="Cancel">
+      <ButtonSlot label="Cancel" hidden={idle}>
         <button
           type="button"
           aria-label="Cancel"
@@ -52,9 +67,17 @@ export function RecordingControls({ paused, onPauseToggle, onStop, onCancel }: P
   );
 }
 
-function ButtonSlot({ label, children }: { label: string; children: React.ReactNode }) {
+function ButtonSlot({
+  label,
+  children,
+  hidden = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  hidden?: boolean;
+}) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className={`flex flex-col items-center gap-2 ${hidden ? "invisible pointer-events-none" : ""}`}>
       {children}
       <span className="text-[12px] text-[#1A1A1A]">{label}</span>
     </div>

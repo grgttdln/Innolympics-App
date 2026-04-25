@@ -3,14 +3,13 @@
 import { X } from "lucide-react";
 
 type Props = {
-  status: "recording" | "paused";
+  status: "idle" | "recording" | "paused";
   onClose: () => void;
 };
 
 export function RecordingHeader({ status, onClose }: Props) {
-  const isRecording = status === "recording";
-  const dotColor = isRecording ? "#E5484D" : "#A0A0A0";
-  const label = isRecording ? "Recording" : "Paused";
+  const dotColor = status === "recording" ? "#E5484D" : status === "paused" ? "#A0A0A0" : "#8B5CF6";
+  const label = status === "recording" ? "Recording" : status === "paused" ? "Paused" : "Ready";
 
   return (
     <div className="flex h-11 items-center justify-between">
