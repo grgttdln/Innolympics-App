@@ -256,58 +256,77 @@ export function GroundingBringMeGame() {
     }
   }
 
+  const totalPrompts = 5;
+  const activeDotIndex = Math.min(round - 1, totalPrompts - 1);
+
   return (
-    <section className="flex w-full flex-col items-center gap-4 pt-2 text-center">
-      <div className="w-full px-1">
-        <p className="text-[22px] font-semibold leading-tight text-[#2A2A2A]">
+    <section className="flex w-full flex-col items-center gap-5 pt-1 text-center">
+      <div className="flex flex-col items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[2.4px] text-[#A881C2]">
+          Item {round} of {totalPrompts}
+        </span>
+        <p className="text-[20px] font-semibold leading-tight tracking-tight text-[#2A2A2A]">
           {prompt}
         </p>
-        <p className="pt-2 text-[13px] font-medium text-[#6A6A6A]">
-          Item {round}
+        <p className="text-[12px] leading-relaxed text-[#8A8274]">
+          Point. Hold steady. Tap Check.
         </p>
       </div>
 
-      <div className="w-full overflow-hidden rounded-3xl border border-[#D5C9E3] bg-[#1A1A1A]">
-        <video
-          ref={videoRef}
-          className="aspect-4/3 w-full object-cover"
-          playsInline
-          muted
-          autoPlay
-        />
+      <div className="relative w-full">
+        <div className="rounded-[28px] bg-gradient-to-br from-white to-[#F5EEE4] p-2 shadow-[0_1px_2px_rgba(91,61,120,0.06),0_18px_40px_-20px_rgba(91,61,120,0.25)]">
+          <div className="overflow-hidden rounded-[22px] border border-[#F1E4D0] bg-[#FAF4EA]">
+            <video
+              ref={videoRef}
+              className="aspect-4/3 w-full object-cover"
+              playsInline
+              muted
+              autoPlay
+            />
+          </div>
+        </div>
       </div>
 
       <canvas ref={canvasRef} className="hidden" aria-hidden />
 
-      <div className="flex w-full flex-wrap items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={isCameraReady ? stopCamera : openCamera}
-          className={`rounded-full px-4 py-2 text-[13px] font-semibold disabled:opacity-50 ${
-            isCameraReady
-              ? 'border border-[#C7B3DA] bg-white text-[#5B3D78]'
-              : 'bg-[#5B3D78] text-white'
-          }`}
-        >
-          {isCameraReady ? 'Stop Camera' : 'Start Camera'}
-        </button>
+      <div className="flex items-center gap-2" aria-hidden>
+        {Array.from({ length: totalPrompts }).map((_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i === activeDotIndex ? 'w-6 bg-[#5B3D78]' : 'w-1.5 bg-[#E9DAF2]'
+            }`}
+          />
+        ))}
+      </div>
 
+      <div className="flex w-full flex-col items-center gap-2">
         <button
           type="button"
           onClick={captureAndAnalyze}
           disabled={!isCameraReady || isAnalyzing}
-          className="rounded-full bg-[#1A1A1A] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+          className="w-full rounded-[18px] bg-[#5B3D78] py-4 text-[15px] font-semibold text-white shadow-[0_10px_28px_-12px_rgba(91,61,120,0.6)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985] disabled:opacity-50 disabled:shadow-none"
         >
-          {isAnalyzing ? 'Checking...' : 'Check Item'}
+          {isAnalyzing ? 'Checking…' : 'Check item'}
+        </button>
+
+        <button
+          type="button"
+          onClick={isCameraReady ? stopCamera : openCamera}
+          className="text-[12px] font-semibold uppercase tracking-[2px] text-[#A881C2] transition-opacity active:opacity-70"
+        >
+          {isCameraReady ? 'Stop camera' : 'Start camera'}
         </button>
       </div>
 
       {cameraError && !isCameraReady ? (
-        <p className="text-[13px] text-[#B04545]">{cameraError}</p>
+        <p className="w-full rounded-2xl border border-[#F1D3D3] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#B04545]">
+          {cameraError}
+        </p>
       ) : null}
 
       {feedback ? (
-        <p className="w-full wrap-break-word whitespace-pre-wrap rounded-2xl bg-[#F2EBF8] px-4 py-3 text-[14px] leading-relaxed text-[#3E3252]">
+        <p className="w-full wrap-break-word whitespace-pre-wrap rounded-2xl border border-[#E9DAF2] bg-white px-4 py-3 text-[14px] leading-relaxed text-[#3E3252]">
           {feedback}
         </p>
       ) : null}
