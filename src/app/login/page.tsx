@@ -86,6 +86,16 @@ export default function LoginPage() {
             Create an account
           </Link>
         </div>
+
+        <div className="flex justify-center pt-1">
+          <Link
+            href="/professional"
+            className="flex items-center gap-1.5 text-[12px] text-[#B8B0A7] transition-colors hover:text-[#A881C2]"
+          >
+            Are you a counselor?{" "}
+            <span className="font-semibold text-[#A881C2]">Professional Portal →</span>
+          </Link>
+        </div>
       </form>
     </AuthShell>
   );
