@@ -69,11 +69,14 @@ export function useLiveConversation(): UseLiveConversation {
     if (text.length > 0) pushTurn({ role: "user", text, ts: Date.now() });
   }, [pushTurn]);
 
-  const flushAiTurn = useCallback(() => {
-    const text = aiBufferRef.current.trim();
-    aiBufferRef.current = "";
-    if (text.length > 0) pushTurn({ role: "ai", text, ts: Date.now() });
-  }, [pushTurn]);
+  const flushAiTurn = useCallback(
+    (clear = true) => {
+      const text = aiBufferRef.current.trim();
+      if (text.length > 0) pushTurn({ role: "ai", text, ts: Date.now() });
+      if (clear) aiBufferRef.current = "";
+    },
+    [pushTurn],
+  );
 
   const teardown = useCallback(() => {
     aliveRef.current = false;
@@ -135,15 +138,27 @@ export function useLiveConversation(): UseLiveConversation {
 
       if (sc.generationComplete || sc.turnComplete) {
         flushUserTurn();
-        flushAiTurn();
-        const clearCaption = () => {
-          setLatestAiCaption("");
+        // Save the AI turn to history but KEEP the text buffer alive so
+        // the caption ticker can keep revealing words while audio plays.
+        flushAiTurn(false);
+        const finishTurn = () => {
+          // Briefly show the full caption once audio finishes so the last
+          // words aren't clipped, then clear on the next tick.
+          const full = aiBufferRef.current.trim();
+          if (full.length > 0) {
+            const words = full.split(/\s+/);
+            setLatestAiCaption(
+              words.slice(-CAPTION_MAX_WORDS).join(" "),
+            );
+          }
+          aiBufferRef.current = "";
           setStatus("listening");
+          window.setTimeout(() => setLatestAiCaption(""), 1200);
         };
         if (playbackRef.current?.isPlaying()) {
-          playbackRef.current.onIdle(clearCaption);
+          playbackRef.current.onIdle(finishTurn);
         } else {
-          clearCaption();
+          finishTurn();
         }
       }
 
@@ -254,15 +269,20 @@ export function useLiveConversation(): UseLiveConversation {
         const full = aiBufferRef.current.trim();
         if (full.length === 0) return;
         const words = full.split(/\s+/);
+        // +2 lookahead so the last 1-2 spoken words aren't clipped by
+        // playedFraction lagging real time slightly.
         const fraction = q.playedFraction();
-        const revealed = Math.max(1, Math.ceil(words.length * fraction));
+        const revealed = Math.min(
+          words.length,
+          Math.max(1, Math.ceil(words.length * fraction) + 2),
+        );
         const visible = words.slice(0, revealed);
         const tail =
           visible.length > CAPTION_MAX_WORDS
             ? visible.slice(-CAPTION_MAX_WORDS)
             : visible;
         setLatestAiCaption(tail.join(" "));
-      }, 90);
+      }, 80);
 
       setStatus("listening");
     } catch (err) {
