@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mic } from "lucide-react";
 import { useLiveConversation, type LiveError } from "@/lib/use-live-conversation";
+import { loadUser } from "@/lib/session";
 import { putTurns } from "@/lib/turns-store";
 import { RecordingHeader } from "@/components/voice-recorder/recording-header";
 import { DiscardConfirmSheet } from "@/components/voice-recorder/discard-confirm-sheet";
 import { LiveOrb } from "@/components/voice-recorder/live-orb";
 import { RecordingControls } from "@/components/voice-recorder/recording-controls";
+import { SupportCard } from "@/components/follow-up-card";
 
 function formatDuration(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -23,11 +25,16 @@ const ERROR_MESSAGES: Record<LiveError, string> = {
   unsupported: "Your browser doesn't support live audio.",
   "token-failed": "Couldn't start the live session. Please try again.",
   "socket-failed": "The live session disconnected. Please try again.",
+  "auth-required": "Please sign in again before starting a voice session.",
 };
 
 export default function VoiceJournalPage() {
   const router = useRouter();
-  const live = useLiveConversation();
+  const [userId, setUserId] = useState<number | null>(null);
+  useEffect(() => {
+    setUserId(loadUser()?.id ?? null);
+  }, []);
+  const live = useLiveConversation({ userId });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +94,9 @@ export default function VoiceJournalPage() {
       ? "PAUSED"
       : "";
 
-  const idleCaption = "Tap record when you're ready.\nI'll listen and ask gentle questions.";
+  const idleCaption = userId
+    ? "Tap record when you're ready.\nI'll listen and ask gentle questions."
+    : "Please sign in before starting a voice session.";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F4F2ED]">
@@ -131,10 +140,16 @@ export default function VoiceJournalPage() {
               <LiveOrb status={live.status} />
             </div>
 
-            <LiveCaption
-              text={live.latestAiCaption}
-              fallback={live.status === "idle" ? idleCaption : ""}
-            />
+            {live.crisisIntercept ? (
+              <div className="mt-6">
+                <SupportCard />
+              </div>
+            ) : (
+              <LiveCaption
+                text={live.latestAiCaption}
+                fallback={live.status === "idle" ? idleCaption : ""}
+              />
+            )}
 
             <div className="flex-1" />
 

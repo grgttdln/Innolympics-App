@@ -1,9 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
+import {
+  FunctionResponseScheduling,
+  GoogleGenAI,
+  Modality,
+  type LiveServerMessage,
+  type Session,
+} from "@google/genai";
 import { createPcmPlaybackQueue, type PcmPlaybackQueue } from "./pcm-playback-queue";
 import type { Turn } from "./turns-store";
+import { scanForCrisis } from "@/lib/safety/crisis-scanner";
+import { VOICE_UNIFIED_PROMPT } from "@/lib/agents/prompts/voice-unified";
+import { VOICE_TOOLS } from "@/lib/agents/voice-tools";
+import { CRISIS_INTERCEPT_PH } from "@/lib/safety/crisis-templates";
 
 export type LiveStatus =
   | "idle"
@@ -18,7 +28,14 @@ export type LiveError =
   | "socket-failed"
   | "mic-denied"
   | "mic-unavailable"
-  | "unsupported";
+  | "unsupported"
+  | "auth-required";
+
+export type CrisisIntercept = {
+  keywords: string[];
+  message: string;
+  triggeredAt: number;
+};
 
 export type UseLiveConversation = {
   status: LiveStatus;
@@ -26,6 +43,7 @@ export type UseLiveConversation = {
   turns: Turn[];
   latestAiCaption: string;
   error: LiveError | null;
+  crisisIntercept: CrisisIntercept | null;
   start: () => Promise<void>;
   stop: () => Promise<Turn[]>;
   cancel: () => void;
@@ -35,12 +53,27 @@ export type UseLiveConversation = {
 
 type TokenResponse = { token: string; model: string };
 
-export function useLiveConversation(): UseLiveConversation {
+/** Max time we wait for a backend memory route before telling Gemini "empty". */
+const TOOL_CALL_TIMEOUT_MS = 300;
+
+/** After turnComplete, how long we give the async /api/journal POST. */
+const JOURNAL_POST_TIMEOUT_MS = 15_000;
+
+type UseLiveConversationOptions = {
+  /** Integer user id from `loadUser()`. Required for memory + backend writes. */
+  userId: number | null;
+};
+
+export function useLiveConversation(
+  { userId }: UseLiveConversationOptions = { userId: null },
+): UseLiveConversation {
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [durationMs, setDurationMs] = useState(0);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [latestAiCaption, setLatestAiCaption] = useState("");
   const [error, setError] = useState<LiveError | null>(null);
+  const [crisisIntercept, setCrisisIntercept] =
+    useState<CrisisIntercept | null>(null);
 
   const sessionRef = useRef<Session | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -55,6 +88,17 @@ export function useLiveConversation(): UseLiveConversation {
   const turnsRef = useRef<Turn[]>([]);
   const aliveRef = useRef(false);
   const pausedRef = useRef(false);
+
+  // Per-session safety state.
+  const userIdRef = useRef<number | null>(userId);
+  const elevatedCautionRef = useRef(false);
+  const crisisInterceptedRef = useRef(false);
+  const pendingEscalationRef = useRef<string | null>(null);
+
+  // Keep userIdRef in sync so mid-session session changes don't break writes.
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
 
   const pushTurn = useCallback((turn: Turn) => {
     turnsRef.current = [...turnsRef.current, turn];
@@ -106,13 +150,206 @@ export function useLiveConversation(): UseLiveConversation {
 
   useEffect(() => () => teardown(), [teardown]);
 
+  /**
+   * Fetch a single tool-call target with a hard timeout. On any failure
+   * we resolve to a safe empty payload so the voice turn never stalls.
+   */
+  const callMemoryRoute = useCallback(
+    async (
+      path: "/api/memory/search" | "/api/memory/log-mood",
+      body: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> => {
+      const uid = userIdRef.current;
+      if (uid === null) {
+        return path.endsWith("search")
+          ? { entries: [] }
+          : { status: "error" };
+      }
+      const controller = new AbortController();
+      const timer = window.setTimeout(
+        () => controller.abort(),
+        TOOL_CALL_TIMEOUT_MS,
+      );
+      try {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(uid),
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as Record<string, unknown>;
+      } catch (err) {
+        console.warn(`[live] ${path} failed or timed out`, err);
+        return path.endsWith("search")
+          ? { entries: [] }
+          : { status: "error" };
+      } finally {
+        window.clearTimeout(timer);
+      }
+    },
+    [],
+  );
+
+  const handleToolCall = useCallback(
+    async (msg: LiveServerMessage) => {
+      const calls = msg.toolCall?.functionCalls;
+      if (!calls || calls.length === 0) return;
+
+      const responses = await Promise.all(
+        calls.map(async (fc) => {
+          const args = (fc.args ?? {}) as Record<string, unknown>;
+          let response: Record<string, unknown>;
+          if (fc.name === "get_journal_context") {
+            const query =
+              typeof args.query === "string" ? args.query : "";
+            response = await callMemoryRoute("/api/memory/search", {
+              query,
+            });
+          } else if (fc.name === "log_mood_score") {
+            const mood_score =
+              typeof args.mood_score === "number" ? args.mood_score : 0;
+            const emotions = Array.isArray(args.emotions)
+              ? (args.emotions as unknown[]).filter(
+                  (v): v is string => typeof v === "string",
+                )
+              : [];
+            response = await callMemoryRoute("/api/memory/log-mood", {
+              mood_score,
+              emotions,
+            });
+          } else {
+            response = { error: `unknown tool ${fc.name}` };
+          }
+
+          return {
+            id: fc.id,
+            name: fc.name,
+            response,
+            // Let the model continue speaking rather than interrupting its
+            // current turn — fetching past entries shouldn't stop mid-sentence.
+            scheduling: FunctionResponseScheduling.WHEN_IDLE,
+          };
+        }),
+      );
+
+      try {
+        sessionRef.current?.sendToolResponse({ functionResponses: responses });
+      } catch (err) {
+        console.warn("[live] sendToolResponse failed", err);
+      }
+    },
+    [callMemoryRoute],
+  );
+
+  /**
+   * Client-side crisis interceptor. Runs on every input transcription
+   * chunk; on a positive hit it stops audio playback, logs an escalation
+   * event to the backend, and raises session-wide elevatedCaution so the
+   * next turn gets special handling. Fail-safe: pure regex, no network
+   * in the hot path.
+   */
+  const checkCrisisAndIntercept = useCallback((chunk: string) => {
+    if (crisisInterceptedRef.current) return;
+    const scan = scanForCrisis(chunk);
+    if (!scan.detected) return;
+
+    crisisInterceptedRef.current = true;
+    elevatedCautionRef.current = true;
+
+    // 1. Pause Gemini audio immediately — the user needs the hotlines,
+    //    not whatever the model was saying when the trigger hit.
+    playbackRef.current?.clear();
+
+    // 2. Surface the crisis card in UI state.
+    setCrisisIntercept({
+      keywords: scan.keywords,
+      message: CRISIS_INTERCEPT_PH,
+      triggeredAt: Date.now(),
+    });
+
+    // 3. Fire-and-forget escalation log. Don't await.
+    const uid = userIdRef.current;
+    if (uid !== null) {
+      fetch("/api/escalation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": String(uid),
+        },
+        body: JSON.stringify({
+          trigger_type: "keyword_match",
+          severity: 10,
+          context: {
+            source: "voice_client_scanner",
+            keywords: scan.keywords,
+            transcript_chunk: chunk.slice(0, 500),
+          },
+        }),
+      }).catch((err) => console.warn("[live] escalation log failed", err));
+    }
+  }, []);
+
+  /**
+   * Fire-and-forget POST to /api/journal after a user turn completes.
+   * Runs the full LangGraph pipeline in the background so memory,
+   * mood trend, and escalation all stay in sync across modes.
+   */
+  const postTurnToBackend = useCallback((transcript: string) => {
+    const uid = userIdRef.current;
+    if (uid === null || transcript.trim().length === 0) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(
+      () => controller.abort(),
+      JOURNAL_POST_TIMEOUT_MS,
+    );
+    fetch("/api/journal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": String(uid),
+      },
+      body: JSON.stringify({ transcript, input_type: "voice" }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          needs_escalation?: boolean;
+          intent?: string;
+        };
+        if (data.needs_escalation) {
+          pendingEscalationRef.current =
+            "Your recent entries suggest a downward trend. Please gently check in with the user, and remind them that professional support is available.";
+        }
+      })
+      .catch((err) => {
+        if (err?.name !== "AbortError") {
+          console.warn("[live] /api/journal async write failed", err);
+        }
+      })
+      .finally(() => window.clearTimeout(timer));
+  }, []);
+
   const handleServerMessage = useCallback(
     (msg: LiveServerMessage) => {
+      // Handle tool calls (they're not wrapped in serverContent).
+      if (msg.toolCall) {
+        void handleToolCall(msg);
+        return;
+      }
+
       const sc = msg.serverContent;
       if (!sc) return;
 
       if (sc.inputTranscription?.text) {
-        userBufferRef.current += sc.inputTranscription.text;
+        const chunk = sc.inputTranscription.text;
+        userBufferRef.current += chunk;
+        checkCrisisAndIntercept(chunk);
       }
       for (const part of sc.modelTurn?.parts ?? []) {
         const inline = part.inlineData;
@@ -135,10 +372,38 @@ export function useLiveConversation(): UseLiveConversation {
       }
 
       if (sc.generationComplete || sc.turnComplete) {
+        // Snapshot the user transcript *before* flushUserTurn clears the
+        // buffer, so we can fire the async POST against the right text.
+        const userText = userBufferRef.current.trim();
+
         flushUserTurn();
         // Save the AI turn to history but KEEP the text buffer alive so
         // the caption ticker can keep revealing words while audio plays.
         flushAiTurn(false);
+
+        // Fire-and-forget backend run of the LangGraph pipeline. Never
+        // awaited — the voice loop must stay real-time. Skipped when
+        // the client-side crisis scanner already owns the turn.
+        if (userText.length > 0 && !crisisInterceptedRef.current) {
+          postTurnToBackend(userText);
+        }
+
+        // If a prior turn surfaced a backend-detected escalation, hand
+        // the context to the model via clientContent so the next turn
+        // is informed. Cleared immediately so we don't double-deliver.
+        const pending = pendingEscalationRef.current;
+        if (pending) {
+          pendingEscalationRef.current = null;
+          try {
+            sessionRef.current?.sendClientContent({
+              turns: [{ role: "user", parts: [{ text: `[system] ${pending}` }] }],
+              turnComplete: false,
+            });
+          } catch (err) {
+            console.warn("[live] pending escalation inject failed", err);
+          }
+        }
+
         const finishTurn = () => {
           // Briefly show the full caption once audio finishes so the last
           // words aren't clipped, then clear.
@@ -157,13 +422,24 @@ export function useLiveConversation(): UseLiveConversation {
 
       if (sc.interrupted) playbackRef.current?.clear();
     },
-    [flushAiTurn, flushUserTurn],
+    [
+      checkCrisisAndIntercept,
+      flushAiTurn,
+      flushUserTurn,
+      handleToolCall,
+      postTurnToBackend,
+    ],
   );
 
   const start = useCallback(async () => {
     if (typeof window === "undefined") return;
     if (!navigator.mediaDevices?.getUserMedia || typeof AudioWorkletNode === "undefined") {
       setError("unsupported");
+      setStatus("error");
+      return;
+    }
+    if (userIdRef.current === null) {
+      setError("auth-required");
       setStatus("error");
       return;
     }
@@ -175,6 +451,10 @@ export function useLiveConversation(): UseLiveConversation {
     turnsRef.current = [];
     setTurns([]);
     setLatestAiCaption("");
+    setCrisisIntercept(null);
+    crisisInterceptedRef.current = false;
+    elevatedCautionRef.current = false;
+    pendingEscalationRef.current = null;
 
     let tokenRes: TokenResponse;
     try {
@@ -201,10 +481,22 @@ export function useLiveConversation(): UseLiveConversation {
     try {
       playbackRef.current = createPcmPlaybackQueue(24000);
 
-      const ai = new GoogleGenAI({ apiKey: tokenRes.token });
+      // Ephemeral tokens require the v1alpha API surface — see the
+      // SDK's console.warn in authTokens.create. The token *is* the
+      // apiKey here; it's short-lived and bound to this Live session.
+      const ai = new GoogleGenAI({
+        apiKey: tokenRes.token,
+        httpOptions: { apiVersion: "v1alpha" },
+      });
       const session = await ai.live.connect({
         model: tokenRes.model,
-        config: { responseModalities: [Modality.AUDIO] },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          systemInstruction: {
+            parts: [{ text: VOICE_UNIFIED_PROMPT }],
+          },
+          tools: [{ functionDeclarations: VOICE_TOOLS }],
+        },
         callbacks: {
           onopen: () => console.log("[live] socket open"),
           onmessage: handleServerMessage,
@@ -297,6 +589,10 @@ export function useLiveConversation(): UseLiveConversation {
     turnsRef.current = [];
     setLatestAiCaption("");
     setError(null);
+    setCrisisIntercept(null);
+    crisisInterceptedRef.current = false;
+    elevatedCautionRef.current = false;
+    pendingEscalationRef.current = null;
   }, [teardown]);
 
   const pause = useCallback(() => {
@@ -315,5 +611,17 @@ export function useLiveConversation(): UseLiveConversation {
     setStatus("listening");
   }, []);
 
-  return { status, durationMs, turns, latestAiCaption, error, start, stop, cancel, pause, resume };
+  return {
+    status,
+    durationMs,
+    turns,
+    latestAiCaption,
+    error,
+    crisisIntercept,
+    start,
+    stop,
+    cancel,
+    pause,
+    resume,
+  };
 }
