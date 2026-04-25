@@ -177,16 +177,9 @@ function LiveCaption({ text, fallback }: { text: string; fallback: string }) {
   const display = text || fallback;
   return (
     <div className="mx-auto mt-6 flex min-h-[56px] max-w-[300px] items-center justify-center">
-      <style>{`
-        @keyframes caption-in {
-          0%   { opacity: 0; transform: translateY(4px); filter: blur(2px); }
-          100% { opacity: 1; transform: translateY(0);  filter: blur(0);  }
-        }
-      `}</style>
       <p
-        key={display}
         aria-live="polite"
-        className={`whitespace-pre-line text-center text-[16px] font-medium leading-[22px] tracking-[-0.2px] animate-[caption-in_400ms_cubic-bezier(0.32,0.72,0,1)_both] ${
+        className={`whitespace-pre-line text-center text-[16px] font-medium leading-[22px] tracking-[-0.2px] ${
           text ? "text-[#1A1A1A]" : "text-[#8A8A8A]"
         }`}
       >
