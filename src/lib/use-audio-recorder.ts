@@ -63,7 +63,7 @@ export function useAudioRecorder(): UseAudioRecorder {
 
   useEffect(() => () => teardown(), [teardown]);
 
-  const tick = useCallback(() => {
+  const tick = useCallback(function tickFn() {
     const analyser = analyserRef.current;
     if (!analyser) return;
     const buf = new Uint8Array(analyser.fftSize);
@@ -75,7 +75,7 @@ export function useAudioRecorder(): UseAudioRecorder {
     }
     setAmplitude(peak);
     setDurationMs(Date.now() - startedAtRef.current - pausedAccumRef.current);
-    rafRef.current = requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame(tickFn);
   }, []);
 
   const start = useCallback(async () => {

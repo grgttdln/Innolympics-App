@@ -55,6 +55,7 @@ export default function FreeformWritingPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate derived values on mount
     setMeta(formatDate(new Date()));
     setUserId(loadUser()?.id ?? null);
   }, []);

@@ -71,12 +71,6 @@ export function GroundingBringMeGame() {
     return `Show me item ${currentRound + 1} with a clear shape.`;
   }
 
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
   function stopCamera() {
     if (!streamRef.current) {
       return;
@@ -92,6 +86,12 @@ export function GroundingBringMeGame() {
     }
     setIsCameraReady(false);
   }
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   async function openCamera() {
     setCameraError(null);

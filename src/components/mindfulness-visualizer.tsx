@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type Phase = 'inhale' | 'hold' | 'exhale';
@@ -273,13 +274,13 @@ export function MindfulnessVisualizer() {
             <RestartIcon size={14} />
             Another round
           </button>
-          <a
+          <Link
             href="/wellness"
             className="flex items-center justify-center rounded-[18px] bg-[#2A2A2A] py-[14px] text-[14px] font-semibold text-white shadow-[0_10px_28px_-12px_rgba(42,42,42,0.5)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985]"
             style={{ transitionTimingFunction: EASE }}
           >
             Done for now
-          </a>
+          </Link>
         </div>
 
         <MindfulnessKeyframes />

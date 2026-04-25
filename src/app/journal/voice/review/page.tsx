@@ -54,12 +54,14 @@ function VoiceReviewPageInner() {
   const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
     setUserId(loadUser()?.id ?? null);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     if (!id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync load state from route param
       setLoad({ kind: "not-found" });
       return;
     }

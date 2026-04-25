@@ -18,6 +18,7 @@ export default function DashboardPage() {
       router.replace("/login");
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
     setUser(stored);
   }, [router]);
 

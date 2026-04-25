@@ -32,6 +32,7 @@ export default function VoiceJournalPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<number | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
     setUserId(loadUser()?.id ?? null);
   }, []);
   const live = useLiveConversation({ userId });

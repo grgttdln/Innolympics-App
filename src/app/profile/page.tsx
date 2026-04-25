@@ -98,6 +98,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const stored = loadUser();
     if (!stored) { router.replace("/login"); return; }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
     setUser(stored);
   }, [router]);
 

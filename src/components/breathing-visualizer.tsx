@@ -72,6 +72,7 @@ function usePrefersReducedMotion(): boolean {
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- subscribe to browser matchMedia on mount
     setPrefers(mq.matches);
     const handler = (event: MediaQueryListEvent) => setPrefers(event.matches);
     mq.addEventListener('change', handler);
@@ -110,6 +111,7 @@ export function BreathingVisualizer({ mode }: BreathingVisualizerProps) {
 
   useEffect(() => {
     if (prefersReducedMotion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset animation frame when user prefers reduced motion
       setElapsedMs(0);
       return;
     }
