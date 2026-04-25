@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Timer } from "lucide-react";
+import { ArrowRight, Timer, Sparkles, Wind, Anchor, type LucideIcon } from "lucide-react";
 
-export type WellnessTechniqueVariant = "lavender" | "dark" | "plum";
+export type WellnessTechniqueCategory = "mindfulness" | "breathing" | "grounding";
 
 export type WellnessTechnique = {
   slug: string;
@@ -9,98 +9,82 @@ export type WellnessTechnique = {
   title: string;
   description: string;
   duration: string;
-  variant: WellnessTechniqueVariant;
+  category: WellnessTechniqueCategory;
 };
 
-const THEMES: Record<
-  WellnessTechniqueVariant,
+const CATEGORY_STYLES: Record<
+  WellnessTechniqueCategory,
   {
-    card: string;
-    badge: string;
-    badgeText: string;
-    title: string;
-    description: string;
-    timeBadge: string;
-    timeIcon: string;
-    timeText: string;
-    cta: string;
+    icon: LucideIcon;
+    medallionBg: string;
+    medallionIcon: string;
+    accent: string;
   }
 > = {
-  lavender: {
-    card: "bg-[#E9DAF2]",
-    badge: "bg-[#5B3D78]",
-    badgeText: "text-white",
-    title: "text-[#2A2A2A]",
-    description: "text-[#4A3F36]",
-    timeBadge: "bg-white",
-    timeIcon: "text-[#5B3D78]",
-    timeText: "text-[#5B3D78]",
-    cta: "bg-[#5B3D78] text-white",
+  mindfulness: {
+    icon: Sparkles,
+    medallionBg: "bg-[#F3E8FA]",
+    medallionIcon: "text-[#A881C2]",
+    accent: "text-[#A881C2]",
   },
-  dark: {
-    card: "bg-[#1A1A1A]",
-    badge: "bg-[#A881C2]",
-    badgeText: "text-white",
-    title: "text-[#FCFAF7]",
-    description: "text-[#B8B0A7]",
-    timeBadge: "bg-[#2A2A2A]",
-    timeIcon: "text-[#A881C2]",
-    timeText: "text-[#E9DAF2]",
-    cta: "bg-[#A881C2] text-white",
+  breathing: {
+    icon: Wind,
+    medallionBg: "bg-[#EDE1F4]",
+    medallionIcon: "text-[#7B5A94]",
+    accent: "text-[#7B5A94]",
   },
-  plum: {
-    card: "bg-[#5B3D78]",
-    badge: "bg-[#E9DAF2]",
-    badgeText: "text-[#5B3D78]",
-    title: "text-[#FCFAF7]",
-    description: "text-[#E9DAF2]",
-    timeBadge: "bg-[#FCFAF7]",
-    timeIcon: "text-[#5B3D78]",
-    timeText: "text-[#5B3D78]",
-    cta: "bg-[#A881C2] text-white",
+  grounding: {
+    icon: Anchor,
+    medallionBg: "bg-[#E9DAF2]",
+    medallionIcon: "text-[#5B3D78]",
+    accent: "text-[#5B3D78]",
   },
 };
 
 export function WellnessTechniqueCard({ technique }: { technique: WellnessTechnique }) {
-  const theme = THEMES[technique.variant];
+  const style = CATEGORY_STYLES[technique.category];
+  const Icon = style.icon;
 
   return (
     <Link
       href={`/wellness/${technique.slug}`}
-      className={`flex items-center gap-3 rounded-[24px] py-[18px] pl-5 pr-[18px] transition-transform active:scale-[0.99] ${theme.card}`}
+      className="group flex items-center gap-4 rounded-[24px] border border-[#EFE6D9] bg-white p-4 shadow-[0_1px_2px_rgba(43,30,61,0.04),0_4px_16px_-8px_rgba(43,30,61,0.08)] transition-all active:scale-[0.99] active:shadow-[0_1px_2px_rgba(43,30,61,0.04)]"
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <span
-          className={`self-start rounded-[10px] px-2.5 py-1 text-[10px] font-bold leading-none tracking-[1px] ${theme.badge} ${theme.badgeText}`}
-        >
-          {technique.badge}
-        </span>
-        <h3 className={`text-[18px] font-bold leading-tight ${theme.title}`}>
-          {technique.title}
-        </h3>
-        <p className={`text-[13px] leading-[1.4] ${theme.description}`}>
-          {technique.description}
-        </p>
-        <div className="pt-0.5">
+      <span
+        aria-hidden
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${style.medallionBg}`}
+      >
+        <Icon className={`h-[22px] w-[22px] ${style.medallionIcon}`} strokeWidth={1.75} />
+      </span>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-center gap-2">
           <span
-            className={`inline-flex items-center gap-1 rounded-xl py-1 pl-2 pr-2.5 ${theme.timeBadge}`}
+            className={`text-[10px] font-bold leading-none tracking-[1px] ${style.accent}`}
           >
-            <Timer
-              className={`h-3 w-3 ${theme.timeIcon}`}
-              strokeWidth={1.75}
-            />
-            <span className={`text-[11px] font-semibold leading-none ${theme.timeText}`}>
+            {technique.badge}
+          </span>
+          <span aria-hidden className="h-1 w-1 rounded-full bg-[#D8CDBE]" />
+          <span className="inline-flex items-center gap-1 text-[#8A8274]">
+            <Timer className="h-3 w-3" strokeWidth={1.75} />
+            <span className="text-[11px] font-semibold leading-none">
               {technique.duration}
             </span>
           </span>
         </div>
+        <h3 className="text-[16px] font-bold leading-tight text-[#2A2A2A]">
+          {technique.title}
+        </h3>
+        <p className="truncate text-[13px] leading-[1.4] text-[#8A8274]">
+          {technique.description}
+        </p>
       </div>
 
       <span
         aria-hidden
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${theme.cta}`}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F5EEE4] text-[#5B3D78] transition-colors group-active:bg-[#E9DAF2]"
       >
-        <ArrowRight className="h-5 w-5" strokeWidth={2} />
+        <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} />
       </span>
     </Link>
   );

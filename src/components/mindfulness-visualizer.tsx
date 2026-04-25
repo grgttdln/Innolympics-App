@@ -200,7 +200,7 @@ export function MindfulnessVisualizer() {
           </span>
         </button>
 
-        <div className="flex flex-col items-center gap-1 pb-1 text-center">
+        <div className="flex flex-col items-center gap-1.5 pb-10 text-center">
           <p className="text-[14px] font-medium leading-snug text-[#2A2A2A]">
             Let your shoulders drop.
           </p>
@@ -409,7 +409,7 @@ export function MindfulnessVisualizer() {
         </span>
       </div>
 
-      <div className="flex flex-col items-center gap-1 pb-1 text-center">
+      <div className="flex flex-col items-center gap-1.5 pb-10 text-center">
         <p
           key={`${spec.id}-cue`}
           className="text-[14px] font-medium leading-snug text-[#2A2A2A]"

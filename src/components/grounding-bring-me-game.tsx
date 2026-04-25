@@ -25,6 +25,7 @@ export function GroundingBringMeGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [started, setStarted] = useState(false);
   const [round, setRound] = useState(1);
   const [prompt, setPrompt] = useState(INITIAL_PROMPT);
   const [usedPrompts, setUsedPrompts] = useState<string[]>([INITIAL_PROMPT]);
@@ -256,58 +257,96 @@ export function GroundingBringMeGame() {
     }
   }
 
+  const totalPrompts = 5;
+
+  if (!started) {
+    return (
+      <section
+        aria-label="Visual grounding introduction"
+        className="flex w-full flex-1 flex-col items-center justify-center gap-6 pt-1"
+      >
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[2.4px] text-[#A881C2]">
+            Visual grounding
+          </span>
+          <span className="text-[22px] font-semibold leading-none tracking-tight text-[#2A2A2A]">
+            Ready?
+          </span>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 text-center">
+          <p className="max-w-[280px] text-[16px] font-semibold leading-snug text-[#2A2A2A]">
+            Refocus through your camera.
+          </p>
+          <p className="max-w-[260px] text-[13px] leading-relaxed text-[#6E6878]">
+            We&apos;ll ask for five everyday things. Point, hold steady, and tap Check.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStarted(true);
+            void openCamera();
+          }}
+          className="mt-2 flex items-center justify-center gap-2 rounded-[18px] bg-[#5B3D78] px-8 py-[14px] text-[15px] font-semibold text-white shadow-[0_14px_32px_-14px_rgba(91,61,120,0.6)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985]"
+        >
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.5-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z" />
+          </svg>
+          Begin game
+        </button>
+      </section>
+    );
+  }
+
   return (
-    <section className="flex w-full flex-col items-center gap-4 pt-2 text-center">
-      <div className="w-full px-1">
-        <p className="text-[22px] font-semibold leading-tight text-[#2A2A2A]">
+    <section className="flex w-full flex-col gap-5 pt-1">
+      <div className="flex flex-col items-start gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[2.4px] text-[#A881C2]">
+          Item {round} of {totalPrompts}
+        </span>
+        <p className="text-[20px] font-semibold leading-tight tracking-tight text-[#2A2A2A]">
           {prompt}
         </p>
-        <p className="pt-2 text-[13px] font-medium text-[#6A6A6A]">
-          Item {round}
+        <p className="text-[12px] leading-relaxed text-[#8A8274]">
+          Point. Hold steady. Tap Check.
         </p>
       </div>
 
-      <div className="w-full overflow-hidden rounded-3xl border border-[#D5C9E3] bg-[#1A1A1A]">
-        <video
-          ref={videoRef}
-          className="aspect-4/3 w-full object-cover"
-          playsInline
-          muted
-          autoPlay
-        />
+      <div className="relative w-full">
+        <div className="rounded-[28px] bg-gradient-to-br from-white to-[#F5EEE4] p-2 shadow-[0_1px_2px_rgba(91,61,120,0.06),0_18px_40px_-20px_rgba(91,61,120,0.25)]">
+          <div className="overflow-hidden rounded-[22px] border border-[#F1E4D0] bg-[#FAF4EA]">
+            <video
+              ref={videoRef}
+              className="aspect-4/3 w-full object-cover"
+              playsInline
+              muted
+              autoPlay
+            />
+          </div>
+        </div>
       </div>
 
       <canvas ref={canvasRef} className="hidden" aria-hidden />
 
-      <div className="flex w-full flex-wrap items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={isCameraReady ? stopCamera : openCamera}
-          className={`rounded-full px-4 py-2 text-[13px] font-semibold disabled:opacity-50 ${
-            isCameraReady
-              ? 'border border-[#C7B3DA] bg-white text-[#5B3D78]'
-              : 'bg-[#5B3D78] text-white'
-          }`}
-        >
-          {isCameraReady ? 'Stop Camera' : 'Start Camera'}
-        </button>
-
-        <button
-          type="button"
-          onClick={captureAndAnalyze}
-          disabled={!isCameraReady || isAnalyzing}
-          className="rounded-full bg-[#1A1A1A] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
-        >
-          {isAnalyzing ? 'Checking...' : 'Check Item'}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={captureAndAnalyze}
+        disabled={!isCameraReady || isAnalyzing}
+        className="w-full rounded-[18px] bg-[#5B3D78] py-4 text-[15px] font-semibold text-white shadow-[0_10px_28px_-12px_rgba(91,61,120,0.6)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985] disabled:opacity-50 disabled:shadow-none"
+      >
+        {isAnalyzing ? 'Checking…' : 'Check item'}
+      </button>
 
       {cameraError && !isCameraReady ? (
-        <p className="text-[13px] text-[#B04545]">{cameraError}</p>
+        <p className="w-full rounded-2xl border border-[#F1D3D3] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#B04545]">
+          {cameraError}
+        </p>
       ) : null}
 
       {feedback ? (
-        <p className="w-full wrap-break-word whitespace-pre-wrap rounded-2xl bg-[#F2EBF8] px-4 py-3 text-[14px] leading-relaxed text-[#3E3252]">
+        <p className="w-full wrap-break-word whitespace-pre-wrap rounded-2xl border border-[#E9DAF2] bg-white px-4 py-3 text-[14px] leading-relaxed text-[#3E3252]">
           {feedback}
         </p>
       ) : null}
