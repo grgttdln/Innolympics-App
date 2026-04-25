@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FunctionResponseScheduling,
   GoogleGenAI,
   Modality,
   type LiveServerMessage,
@@ -229,9 +228,6 @@ export function useLiveConversation(
             id: fc.id,
             name: fc.name,
             response,
-            // Let the model continue speaking rather than interrupting its
-            // current turn — fetching past entries shouldn't stop mid-sentence.
-            scheduling: FunctionResponseScheduling.WHEN_IDLE,
           };
         }),
       );
@@ -481,20 +477,12 @@ export function useLiveConversation(
     try {
       playbackRef.current = createPcmPlaybackQueue(24000);
 
-      // Ephemeral tokens require the v1alpha API surface — see the
-      // SDK's console.warn in authTokens.create. The token *is* the
-      // apiKey here; it's short-lived and bound to this Live session.
-      const ai = new GoogleGenAI({
-        apiKey: tokenRes.token,
-        httpOptions: { apiVersion: "v1alpha" },
-      });
+      const ai = new GoogleGenAI({ apiKey: tokenRes.token });
       const session = await ai.live.connect({
         model: tokenRes.model,
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: {
-            parts: [{ text: VOICE_UNIFIED_PROMPT }],
-          },
+          systemInstruction: VOICE_UNIFIED_PROMPT,
           tools: [{ functionDeclarations: VOICE_TOOLS }],
         },
         callbacks: {
