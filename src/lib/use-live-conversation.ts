@@ -76,6 +76,7 @@ export function useLiveConversation(): UseLiveConversation {
   const turnsRef = useRef<Turn[]>([]);
   const aliveRef = useRef(false);
   const startedRef = useRef(false);
+  const pausedRef = useRef(false);
 
   const pushTurn = useCallback((turn: Turn) => {
     turnsRef.current = [...turnsRef.current, turn];
@@ -97,6 +98,7 @@ export function useLiveConversation(): UseLiveConversation {
   const teardown = useCallback(() => {
     aliveRef.current = false;
     startedRef.current = false;
+    pausedRef.current = false;
     if (tickRef.current !== null) {
       cancelAnimationFrame(tickRef.current);
       tickRef.current = null;
@@ -298,6 +300,7 @@ export function useLiveConversation(): UseLiveConversation {
       workletNodeRef.current = node;
       source.connect(node);
       node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+        if (pausedRef.current) return;
         const data = int16ToBase64(e.data);
         sessionRef.current?.sendRealtimeInput({
           audio: { data, mimeType: "audio/pcm;rate=16000" },
@@ -338,18 +341,19 @@ export function useLiveConversation(): UseLiveConversation {
 
   const pause = useCallback(() => {
     if (!aliveRef.current) return;
-    const stream = streamRef.current;
-    if (!stream) return;
-    stream.getAudioTracks().forEach((t) => (t.enabled = false));
+    pausedRef.current = true;
+    try {
+      sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true });
+    } catch {}
+    streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
     playbackRef.current?.clear();
     setStatus("paused");
   }, []);
 
   const resume = useCallback(() => {
     if (!aliveRef.current) return;
-    const stream = streamRef.current;
-    if (!stream) return;
-    stream.getAudioTracks().forEach((t) => (t.enabled = true));
+    streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = true));
+    pausedRef.current = false;
     setStatus("listening");
   }, []);
 
