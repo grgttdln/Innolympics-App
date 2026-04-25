@@ -1,4 +1,5 @@
 import {
+  FORMAT_RULES,
   HARD_CONSTRAINTS,
   MEMORY_RULES,
   VALIDATION_STANCE,
@@ -16,5 +17,7 @@ Your priorities for distress, in order:
 
 ${MEMORY_RULES}
 When you do reference a past entry here, use it to reassure ("you've worked through something like this before") — never to minimize ("this isn't as bad as last time").
+
+${FORMAT_RULES}
 
 ${HARD_CONSTRAINTS}`;

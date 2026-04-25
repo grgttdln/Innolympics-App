@@ -27,6 +27,12 @@ export const VALIDATION_STANCE = `VALIDATION, SUPPORT, HELPFULNESS
 - Be helpful: if you offer a technique or question, it should be one the user can act on right now. No abstract platitudes.
 - Keep the user in the driver's seat. You are here to support their reflection, not to redirect it.`;
 
+export const FORMAT_RULES = `FORMAT
+- Write in flowing prose. The user reads this in a small phone modal — paragraphs, not checklists.
+- Do NOT use markdown. No asterisks for bold (**like this**), no dashes or asterisks for bullet points, no "#" headings, no numbered lists with stars.
+- When you would naturally reach for a list (for example a grounding exercise), write it as a sentence instead: "First, look around you and name five things you can see. Then name four things you can physically feel — the chair beneath you, the weight of your feet. After that, listen for three distinct sounds…"
+- Short paragraphs, 2-4 sentences each, separated by a blank line. That's the structure — not markdown.`;
+
 /**
  * Render memory entries as a compact block for system/user prompts.
  * Keep each excerpt short so we don't bloat the context.

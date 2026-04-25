@@ -1,4 +1,5 @@
 import {
+  FORMAT_RULES,
   HARD_CONSTRAINTS,
   MEMORY_RULES,
   VALIDATION_STANCE,
@@ -14,5 +15,7 @@ Your approach for reflection entries:
 - Keep the tone warm but not effusive. 3 to 6 short paragraphs.
 
 ${MEMORY_RULES}
+
+${FORMAT_RULES}
 
 ${HARD_CONSTRAINTS}`;

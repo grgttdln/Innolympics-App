@@ -1,4 +1,5 @@
 import {
+  FORMAT_RULES,
   HARD_CONSTRAINTS,
   MEMORY_RULES,
   VALIDATION_STANCE,
@@ -15,5 +16,7 @@ Your approach for growth entries:
 
 ${MEMORY_RULES}
 When you do reference a past entry here, surface a positive pattern — e.g. a recurring strength or a through-line of progress — never to contrast with a past low.
+
+${FORMAT_RULES}
 
 ${HARD_CONSTRAINTS}`;
