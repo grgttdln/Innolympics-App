@@ -7,7 +7,7 @@ export const WELLNESS_TECHNIQUES: readonly WellnessTechnique[] = [
     title: "Breathe first, friend.",
     description: "A gentle 2-minute reset.",
     duration: "2 min",
-    variant: "lavender",
+    category: "mindfulness",
   },
   {
     slug: "breathing",
@@ -15,7 +15,7 @@ export const WELLNESS_TECHNIQUES: readonly WellnessTechnique[] = [
     title: "Box breathing, 4×4.",
     description: "Inhale, hold, exhale, hold.",
     duration: "1 min",
-    variant: "dark",
+    category: "breathing",
   },
   {
     slug: "bring-me",
@@ -23,7 +23,7 @@ export const WELLNESS_TECHNIQUES: readonly WellnessTechnique[] = [
     title: "Visual Grounding Task",
     description: "Find simple objects and refocus your attention.",
     duration: "2 min",
-    variant: "plum",
+    category: "grounding",
   },
   {
     slug: "grounding",
@@ -31,7 +31,7 @@ export const WELLNESS_TECHNIQUES: readonly WellnessTechnique[] = [
     title: "5-4-3-2-1, find your now.",
     description: "Anchor your senses gently.",
     duration: "3 min",
-    variant: "lavender",
+    category: "grounding",
   },
 ];
 

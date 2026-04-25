@@ -25,6 +25,7 @@ export function GroundingBringMeGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [started, setStarted] = useState(false);
   const [round, setRound] = useState(1);
   const [prompt, setPrompt] = useState(INITIAL_PROMPT);
   const [usedPrompts, setUsedPrompts] = useState<string[]>([INITIAL_PROMPT]);
@@ -257,11 +258,51 @@ export function GroundingBringMeGame() {
   }
 
   const totalPrompts = 5;
-  const activeDotIndex = Math.min(round - 1, totalPrompts - 1);
+
+  if (!started) {
+    return (
+      <section
+        aria-label="Visual grounding introduction"
+        className="flex w-full flex-1 flex-col items-center justify-center gap-6 pt-1"
+      >
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[2.4px] text-[#A881C2]">
+            Visual grounding
+          </span>
+          <span className="text-[22px] font-semibold leading-none tracking-tight text-[#2A2A2A]">
+            Ready?
+          </span>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 text-center">
+          <p className="max-w-[280px] text-[16px] font-semibold leading-snug text-[#2A2A2A]">
+            Refocus through your camera.
+          </p>
+          <p className="max-w-[260px] text-[13px] leading-relaxed text-[#6E6878]">
+            We&apos;ll ask for five everyday things. Point, hold steady, and tap Check.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStarted(true);
+            void openCamera();
+          }}
+          className="mt-2 flex items-center justify-center gap-2 rounded-[18px] bg-[#5B3D78] px-8 py-[14px] text-[15px] font-semibold text-white shadow-[0_14px_32px_-14px_rgba(91,61,120,0.6)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985]"
+        >
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.5-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z" />
+          </svg>
+          Begin game
+        </button>
+      </section>
+    );
+  }
 
   return (
-    <section className="flex w-full flex-col items-center gap-5 pt-1 text-center">
-      <div className="flex flex-col items-center gap-1.5">
+    <section className="flex w-full flex-col gap-5 pt-1">
+      <div className="flex flex-col items-start gap-1.5">
         <span className="text-[10px] font-semibold uppercase tracking-[2.4px] text-[#A881C2]">
           Item {round} of {totalPrompts}
         </span>
@@ -289,35 +330,14 @@ export function GroundingBringMeGame() {
 
       <canvas ref={canvasRef} className="hidden" aria-hidden />
 
-      <div className="flex items-center gap-2" aria-hidden>
-        {Array.from({ length: totalPrompts }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              i === activeDotIndex ? 'w-6 bg-[#5B3D78]' : 'w-1.5 bg-[#E9DAF2]'
-            }`}
-          />
-        ))}
-      </div>
-
-      <div className="flex w-full flex-col items-center gap-2">
-        <button
-          type="button"
-          onClick={captureAndAnalyze}
-          disabled={!isCameraReady || isAnalyzing}
-          className="w-full rounded-[18px] bg-[#5B3D78] py-4 text-[15px] font-semibold text-white shadow-[0_10px_28px_-12px_rgba(91,61,120,0.6)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985] disabled:opacity-50 disabled:shadow-none"
-        >
-          {isAnalyzing ? 'Checking…' : 'Check item'}
-        </button>
-
-        <button
-          type="button"
-          onClick={isCameraReady ? stopCamera : openCamera}
-          className="text-[12px] font-semibold uppercase tracking-[2px] text-[#A881C2] transition-opacity active:opacity-70"
-        >
-          {isCameraReady ? 'Stop camera' : 'Start camera'}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={captureAndAnalyze}
+        disabled={!isCameraReady || isAnalyzing}
+        className="w-full rounded-[18px] bg-[#5B3D78] py-4 text-[15px] font-semibold text-white shadow-[0_10px_28px_-12px_rgba(91,61,120,0.6)] transition-all duration-200 active:translate-y-[1px] active:scale-[0.985] disabled:opacity-50 disabled:shadow-none"
+      >
+        {isAnalyzing ? 'Checking…' : 'Check item'}
+      </button>
 
       {cameraError && !isCameraReady ? (
         <p className="w-full rounded-2xl border border-[#F1D3D3] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#B04545]">

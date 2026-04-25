@@ -32,7 +32,8 @@ export default async function WellnessTechniquePage({
   const showGroundingGame = technique.slug === "bring-me";
   const showGrounding = technique.slug === "grounding";
   const showMindfulness = technique.slug === "mindfulness";
-  const hideHeroCopy = showMindfulness || showGroundingGame;
+  const showBreathing = visualizerMode !== null;
+  const hideHeroCopy = showMindfulness || showBreathing || showGroundingGame || showGrounding;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
@@ -59,14 +60,24 @@ export default async function WellnessTechniquePage({
           {showGroundingGame ? (
             <GroundingBringMeGame />
           ) : showGrounding ? (
-            <div className="flex flex-1 items-stretch justify-center pt-4">
+            <div className="flex flex-1 items-stretch justify-center">
               <GroundingVisualizer />
             </div>
           ) : showMindfulness ? (
             <MindfulnessVisualizer />
           ) : visualizerMode ? (
-            <div className="flex flex-1 items-center justify-center pt-4">
-              <BreathingVisualizer mode={visualizerMode} />
+            <div className="flex flex-1 flex-col gap-5 pt-1">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[2.4px] text-[#A881C2]">
+                  {technique.badge}
+                </span>
+                <span className="text-[22px] font-semibold leading-tight tracking-tight text-[#2A2A2A]">
+                  {technique.description}
+                </span>
+              </div>
+              <div className="flex flex-1 items-center justify-center">
+                <BreathingVisualizer mode={visualizerMode} />
+              </div>
             </div>
           ) : (
             <p className="text-[14px] leading-relaxed text-[#B8B0A7]">
