@@ -95,7 +95,6 @@ export default function VoiceJournalPage() {
         ref={frameRef}
         className="relative flex h-[844px] w-[390px] flex-col overflow-hidden bg-[#FBFAF6]"
       >
-        {/* Ambient radial wash */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 transition-opacity duration-[1200ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
@@ -132,12 +131,10 @@ export default function VoiceJournalPage() {
               <LiveOrb status={live.status} />
             </div>
 
-            <p
-              className="mx-auto mt-6 max-w-[300px] min-h-[56px] whitespace-pre-line text-center text-[16px] font-medium leading-[22px] tracking-[-0.2px] text-[#1A1A1A] transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
-              aria-live="polite"
-            >
-              {live.latestAiCaption || (live.status === "idle" ? idleCaption : "")}
-            </p>
+            <LiveCaption
+              text={live.latestAiCaption}
+              fallback={live.status === "idle" ? idleCaption : ""}
+            />
 
             <div className="flex-1" />
 
@@ -173,6 +170,29 @@ export default function VoiceJournalPage() {
         />
       </div>
     </main>
+  );
+}
+
+function LiveCaption({ text, fallback }: { text: string; fallback: string }) {
+  const display = text || fallback;
+  return (
+    <div className="mx-auto mt-6 flex min-h-[56px] max-w-[300px] items-center justify-center">
+      <style>{`
+        @keyframes caption-in {
+          0%   { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+          100% { opacity: 1; transform: translateY(0);  filter: blur(0);  }
+        }
+      `}</style>
+      <p
+        key={display}
+        aria-live="polite"
+        className={`whitespace-pre-line text-center text-[16px] font-medium leading-[22px] tracking-[-0.2px] animate-[caption-in_400ms_cubic-bezier(0.32,0.72,0,1)_both] ${
+          text ? "text-[#1A1A1A]" : "text-[#8A8A8A]"
+        }`}
+      >
+        {display}
+      </p>
+    </div>
   );
 }
 

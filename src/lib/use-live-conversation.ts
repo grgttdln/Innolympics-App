@@ -35,6 +35,14 @@ export type UseLiveConversation = {
 
 type TokenResponse = { token: string; model: string };
 
+const CAPTION_MAX_WORDS = 14;
+
+function tailWords(text: string, max: number): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= max) return words.join(" ");
+  return words.slice(-max).join(" ");
+}
+
 export function useLiveConversation(): UseLiveConversation {
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [durationMs, setDurationMs] = useState(0);
@@ -106,11 +114,7 @@ export function useLiveConversation(): UseLiveConversation {
       if (sc.inputTranscription?.text) {
         userBufferRef.current += sc.inputTranscription.text;
       }
-      if (sc.outputTranscription?.text) {
-        aiBufferRef.current += sc.outputTranscription.text;
-        setLatestAiCaption(aiBufferRef.current.trim());
-      }
-
+      let sawAudioThisMessage = false;
       for (const part of sc.modelTurn?.parts ?? []) {
         const inline = part.inlineData;
         if (inline?.data && inline.mimeType?.startsWith("audio/pcm")) {
@@ -118,18 +122,34 @@ export function useLiveConversation(): UseLiveConversation {
           const bytes = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
           const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+          // Reset caption at the first audio chunk of a new AI turn.
+          if (aiBufferRef.current.length === 0) setLatestAiCaption("");
           playbackRef.current?.enqueue(pcm);
           setStatus("speaking");
+          sawAudioThisMessage = true;
+        }
+      }
+
+      // Only reveal caption once audio is actually playing for this turn —
+      // Gemini emits transcription slightly ahead of the audio.
+      if (sc.outputTranscription?.text) {
+        aiBufferRef.current += sc.outputTranscription.text;
+        if (sawAudioThisMessage || playbackRef.current?.isPlaying()) {
+          setLatestAiCaption(tailWords(aiBufferRef.current, CAPTION_MAX_WORDS));
         }
       }
 
       if (sc.generationComplete || sc.turnComplete) {
         flushUserTurn();
         flushAiTurn();
-        if (playbackRef.current?.isPlaying()) {
-          playbackRef.current.onIdle(() => setStatus("listening"));
-        } else {
+        const clearCaption = () => {
+          setLatestAiCaption("");
           setStatus("listening");
+        };
+        if (playbackRef.current?.isPlaying()) {
+          playbackRef.current.onIdle(clearCaption);
+        } else {
+          clearCaption();
         }
       }
 
