@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { BreathingVisualizer } from "@/components/breathing-visualizer";
+import { GroundingVisualizer } from "@/components/grounding-visualizer";
+import { MindfulnessVisualizer } from "@/components/mindfulness-visualizer";
 import { WellnessPageHeader } from "@/components/wellness-page-header";
 import {
   WELLNESS_TECHNIQUES,
@@ -24,12 +26,20 @@ export default async function WellnessTechniquePage({
     notFound();
   }
 
-  const visualizerMode =
-    technique.slug === "breathing"
-      ? "box"
-      : technique.slug === "mindfulness"
-        ? "circle"
-        : null;
+  const renderVisualizer = () => {
+    if (technique.slug === "breathing") {
+      return <BreathingVisualizer mode="box" />;
+    }
+    if (technique.slug === "mindfulness") {
+      return <MindfulnessVisualizer />;
+    }
+    if (technique.slug === "grounding") {
+      return <GroundingVisualizer />;
+    }
+    return null;
+  };
+
+  const visualizer = renderVisualizer();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
@@ -46,9 +56,9 @@ export default async function WellnessTechniquePage({
             {technique.description}
           </p>
 
-          {visualizerMode ? (
-            <div className="flex flex-1 items-center justify-center pt-4">
-              <BreathingVisualizer mode={visualizerMode} />
+          {visualizer ? (
+            <div className="flex flex-1 items-stretch justify-center pt-4">
+              {visualizer}
             </div>
           ) : (
             <p className="text-[14px] leading-relaxed text-[#B8B0A7]">
