@@ -13,7 +13,7 @@ export async function POST() {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, apiVersion: "v1alpha" });
     const token = await ai.authTokens.create({
       config: {
         uses: 1,
