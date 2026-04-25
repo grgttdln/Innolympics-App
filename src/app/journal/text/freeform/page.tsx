@@ -4,13 +4,8 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
-import {
-  AiResponseCard,
-  FollowUpCard,
-  MoodChip,
-  ProfessionalHelpCard,
-  SupportCard,
-} from "@/components/follow-up-card";
+import { FollowUpCard, SupportCard } from "@/components/follow-up-card";
+import { InsightsDialog } from "@/components/insights-dialog";
 import { loadUser } from "@/lib/session";
 import type { JournalApiResponse } from "@/lib/types";
 
@@ -51,9 +46,11 @@ export default function FreeformWritingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [aiReply, setAiReply] = useState<JournalApiResponse | null>(null);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const caretRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMeta(formatDate(new Date()));
@@ -170,6 +167,7 @@ export default function FreeformWritingPage() {
       }
       const data = (await res.json()) as JournalApiResponse;
       setAiReply(data);
+      setInsightsOpen(true);
       if (data.intent === "crisis") setLocked(true);
     } catch {
       setSubmitError("Network error. Please try again.");
@@ -180,7 +178,10 @@ export default function FreeformWritingPage() {
 
   return (
     <main className="flex min-h-[100dvh] items-stretch justify-center bg-neutral-100 sm:items-center">
-      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#FCFAF7] sm:h-[844px] sm:w-[390px] sm:rounded-[40px]">
+      <div
+        ref={frameRef}
+        className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#FCFAF7] sm:h-[844px] sm:w-[390px] sm:rounded-[40px]"
+      >
         <div className="hidden h-[54px] shrink-0 sm:block" aria-hidden />
 
         <header className="flex flex-col gap-1.5 px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2.5rem)] sm:pt-10">
@@ -259,18 +260,13 @@ export default function FreeformWritingPage() {
           })}
 
           {aiReply ? (
-            <>
-              <MoodChip
-                moodScore={aiReply.mood_score}
-                emotions={aiReply.emotions}
-              />
-              <AiResponseCard
-                intent={aiReply.intent}
-                response={aiReply.response}
-                escalation={aiReply.needs_escalation}
-              />
-              <ProfessionalHelpCard />
-            </>
+            <button
+              type="button"
+              onClick={() => setInsightsOpen(true)}
+              className="self-start rounded-full border border-[#E9DAF2] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#5B3D78] transition-opacity hover:opacity-80 active:opacity-70"
+            >
+              View reflective insights
+            </button>
           ) : null}
 
           {submitError ? (
@@ -279,6 +275,13 @@ export default function FreeformWritingPage() {
 
           {locked ? <SupportCard /> : null}
         </div>
+
+        <InsightsDialog
+          open={insightsOpen}
+          onOpenChange={setInsightsOpen}
+          reply={aiReply}
+          container={frameRef}
+        />
 
         <div className="shrink-0 border-t border-[#EFE8E0] bg-[#FCFAF7] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
           <div className="flex items-center gap-2.5">

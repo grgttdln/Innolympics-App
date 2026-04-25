@@ -196,12 +196,17 @@ export function MoodChip({ moodScore, emotions }: MoodChipProps) {
   );
 }
 
+type ProfessionalHelpCardProps = {
+  onConnect?: () => void;
+};
+
 /**
- * Static CTA pointing the user to PH mental-health professional resources.
- * Shown on every successful submission as a gentle nudge — not a pressure
- * card. Sits below the AI response.
+ * Shown on every successful submission. Rather than dumping a resource
+ * list, it offers to connect the user to a verified professional by
+ * sharing the journal entry as context — a one-click escape hatch into
+ * real human support.
  */
-export function ProfessionalHelpCard() {
+export function ProfessionalHelpCard({ onConnect }: ProfessionalHelpCardProps) {
   return (
     <div className="flex flex-col gap-2.5 rounded-[20px] border border-[#E4E0D8] bg-white p-4">
       <div className="flex items-center gap-1.5">
@@ -217,34 +222,18 @@ export function ProfessionalHelpCard() {
       </div>
 
       <p className="text-[13px] leading-[1.55] text-[#4B423B]">
-        Journaling helps, but it&apos;s not a replacement for a real
-        conversation with someone trained to listen. If you want to talk to a
-        mental health professional, here are a few ways to start:
+        If you&apos;d like to share this journal entry to ask for advice or
+        raise a concern, we can connect you with one of our verified mental
+        health professionals.
       </p>
 
-      <ul className="flex flex-col gap-1 text-[13px] text-[#1A1A1A]">
-        <li>
-          <span className="font-semibold">MentalHealthPH directory</span>
-          <span className="text-[#6B6259]"> · find a licensed clinician</span>
-        </li>
-        <li>
-          <span className="font-semibold">NCMH</span>
-          <span className="text-[#6B6259]"> · 1553 for appointments &amp; referrals</span>
-        </li>
-        <li>
-          <span className="font-semibold">Hopeline PH</span>
-          <span className="text-[#6B6259]"> · 0917-558-4673</span>
-        </li>
-      </ul>
-
-      <a
-        href="https://mentalhealthph.org/directory/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#1A1A1A] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 active:opacity-80"
+      <button
+        type="button"
+        onClick={onConnect}
+        className="mt-1 inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-[#1A1A1A] px-3 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 active:opacity-80"
       >
-        Browse directory
-      </a>
+        Connect me with a professional
+      </button>
     </div>
   );
 }
