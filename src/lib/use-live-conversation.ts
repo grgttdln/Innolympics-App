@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   GoogleGenAI,
+  MediaResolution,
   Modality,
   type LiveServerMessage,
   type Session,
@@ -481,7 +482,26 @@ export function useLiveConversation(
       const session = await ai.live.connect({
         model: tokenRes.model,
         config: {
+          // Baseline matches commit 429928d which was the last known-good
+          // config for gemini-3.1-flash-live-preview. The Phase 3 rewrite
+          // dropped contextWindowCompression and the transcription configs
+          // when swapping in the unified system prompt, which is what
+          // broke the session. Restoring all four baseline fields and
+          // layering the Phase 3 additions on top.
           responseModalities: [Modality.AUDIO],
+          mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Zephyr" },
+            },
+          },
+          contextWindowCompression: {
+            triggerTokens: "104857",
+            slidingWindow: { targetTokens: "52428" },
+          },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+          // Phase 3 additions on top:
           systemInstruction: VOICE_UNIFIED_PROMPT,
           tools: [{ functionDeclarations: VOICE_TOOLS }],
         },
