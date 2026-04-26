@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Trash2, Phone, Pencil, Check, LogOut, Loader2, X, Mic, FileText,
+  Trash2, Phone, LogOut, Loader2, X, Mic, FileText,
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { loadUser, clearUser, type StoredUser } from "@/lib/session";
@@ -238,12 +238,6 @@ export default function ProfilePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage]             = useState(0);
 
-  /* Bio edit state */
-  const [bio, setBio]               = useState("Add a short bio…");
-  const [editingBio, setEditingBio] = useState(false);
-  const [bioInput, setBioInput]     = useState("");
-  const bioRef = useRef<HTMLTextAreaElement>(null);
-
   useEffect(() => {
     const stored = loadUser();
     if (!stored) { router.replace("/login"); return; }
@@ -273,17 +267,6 @@ export default function ProfilePage() {
     if (!stored) return;
     void fetchEntries(stored.id);
   }, [fetchEntries]);
-
-  /* Bio edit handlers */
-  const startEdit = () => {
-    setBioInput(bio === "Add a short bio…" ? "" : bio);
-    setEditingBio(true);
-    setTimeout(() => bioRef.current?.focus(), 50);
-  };
-  const saveBio = () => {
-    setBio(bioInput.trim() || "Add a short bio…");
-    setEditingBio(false);
-  };
 
   /* Pagination */
   const totalPages  = Math.ceil(entries.length / ENTRIES_PER_PAGE);
@@ -334,7 +317,7 @@ export default function ProfilePage() {
               Profile
             </h1>
             <p className="mt-0.5 text-[14px] text-[#B8B0A7]">
-              {greeting}, {user.name.split(" ")[0]} ✦
+              {greeting} {user.name.split(" ")[0]} ✦
             </p>
           </div>
 
@@ -365,38 +348,6 @@ export default function ProfilePage() {
             <div className="flex flex-1 flex-col gap-1">
               <p className="text-[17px] font-bold leading-none text-[#2A1A4A]">{user.name}</p>
               <p className="text-[12px] text-[#7B5EA7]">{user.email}</p>
-
-              <div className="mt-2">
-                {editingBio ? (
-                  <div className="flex flex-col gap-2">
-                    <textarea
-                      ref={bioRef}
-                      value={bioInput}
-                      onChange={e => setBioInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveBio(); } }}
-                      rows={2}
-                      placeholder="Write something about yourself…"
-                      className="w-full resize-none rounded-[10px] bg-white/50 px-3 py-2 text-[12px] leading-relaxed text-[#2A1A4A] outline-none placeholder:text-[#A881C2]/50"
-                    />
-                    <button
-                      onClick={saveBio}
-                      className="flex w-fit items-center gap-1 rounded-full bg-[#7B5EA7] px-3 py-1.5 text-[11px] font-semibold text-white"
-                    >
-                      <Check size={11} /> Save
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={startEdit} className="flex items-start gap-1.5 text-left">
-                    <span
-                      className="text-[12px] leading-relaxed"
-                      style={{ color: bio === "Add a short bio…" ? "rgba(123,94,167,0.5)" : "#3B1F5E" }}
-                    >
-                      {bio}
-                    </span>
-                    <Pencil size={11} className="mt-0.5 shrink-0" color="#7B5EA7" />
-                  </button>
-                )}
-              </div>
             </div>
           </div>
 
