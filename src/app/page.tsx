@@ -37,11 +37,12 @@ export default function Home() {
 
           <div className="flex flex-col gap-2.5">
             <h1 className="font-[var(--font-geist-sans)] text-[36px] font-bold leading-none tracking-[-1px] text-[#1A1A1A]">
-              Nova
+              Tala
             </h1>
             <p className="text-[15px] leading-[1.45] text-[#666666]">
-              Your calm space to capture ideas, plan your days, and move at
-              your own pace.
+              A gentle companion for your thoughts. Journal by voice or text,
+              and let Tala listen, reflect, and ground you when things feel
+              heavy.
             </p>
           </div>
 
