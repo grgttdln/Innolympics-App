@@ -1,4 +1,6 @@
 import { BackButton } from "@/components/back-button";
+import { GuidedMethodCard } from "@/components/guided-method-card";
+import { GUIDED_METHODS } from "@/components/guided-methods";
 
 export default function GuidedWritingPage() {
   return (
@@ -10,17 +12,19 @@ export default function GuidedWritingPage() {
           <BackButton href="/journal/text" />
         </div>
 
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-7 text-center">
-          <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-1px] text-[#1A1A1A]">
+        <header className="flex flex-col items-center gap-2.5 px-7 pb-4 pt-3.5">
+          <h1 className="text-center text-[26px] font-bold leading-[1.15] tracking-[-1px] text-[#1A1A1A]">
             Guided writing
           </h1>
-          <p className="text-[14px] leading-[1.5] text-[#8A8172]">
-            Prompt flow coming soon.
+          <p className="text-center text-[13px] leading-[1.45] tracking-[0.1px] text-[#8A8172]">
+            Pick a method to begin.
           </p>
-        </div>
+        </header>
 
-        <div className="flex h-[34px] shrink-0 items-center justify-center" aria-hidden>
-          <span className="h-[5px] w-[134px] rounded-full bg-[#1A1A1A]" />
+        <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-5 pb-6">
+          {GUIDED_METHODS.map((method) => (
+            <GuidedMethodCard key={method.key} method={method} />
+          ))}
         </div>
       </div>
     </main>

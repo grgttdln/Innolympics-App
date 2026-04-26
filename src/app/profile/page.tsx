@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ChevronRight, Phone, Pencil, Check, LogOut } from "lucide-react";
+import {
+  Trash2, Phone, LogOut, Loader2, X, Mic, FileText,
+} from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { loadUser, clearUser, type StoredUser } from "@/lib/session";
 import { getGreeting } from "@/lib/greeting";
@@ -16,7 +18,23 @@ type JournalEntry = {
   date: string;
   excerpt: string;
   fullText: string;
+  aiResponse: string | null;
   mood: Mood;
+  inputType: "text" | "voice";
+  intent: string;
+};
+
+type ApiEntry = {
+  id: string;
+  transcript: string;
+  aiResponse: string | null;
+  intent: string;
+  severity: number;
+  moodScore: number;
+  emotions: string[];
+  flagged: boolean;
+  inputType: string;
+  createdAt: string;
 };
 
 /* ── Config ───────────────────────────────────────────────────── */
@@ -29,6 +47,14 @@ const MOOD_COLOR: Record<Mood, string> = {
   overwhelmed: "#F0B5B5",
 };
 
+const MOOD_LABEL: Record<Mood, string> = {
+  calm:        "Calm",
+  happy:       "Happy",
+  anxious:     "Anxious",
+  sad:         "Sad",
+  overwhelmed: "Overwhelmed",
+};
+
 const HOTLINES = [
   { name: "DOH Mental Health Crisis Line", number: "1553",           tel: "1553" },
   { name: "NCMH Crisis Line (USAP)",       number: "0917-899-8727",  tel: "09178998727" },
@@ -36,64 +62,181 @@ const HOTLINES = [
 ];
 
 const ENTRIES_PER_PAGE = 3;
-
-/* ── Mock data ────────────────────────────────────────────────── */
-
-const INITIAL_ENTRIES: JournalEntry[] = [
-  {
-    id: "1", date: "Oct 12, 2025", mood: "calm",
-    excerpt: "Today was overwhelming. I found myself unable to focus during the morning...",
-    fullText: "Today was overwhelming. I found myself unable to focus during the morning. I tried the box breathing technique and it helped a little. I need to rest more and plan better for tomorrow.",
-  },
-  {
-    id: "2", date: "Oct 8, 2025", mood: "happy",
-    excerpt: "Managed to complete my thesis outline. It felt like a small victory even though anxiety is still there...",
-    fullText: "Managed to complete my thesis outline. It felt like a small victory even though anxiety is still there. I'm proud of myself for pushing through. Treated myself to a walk after.",
-  },
-  {
-    id: "3", date: "Oct 3, 2025", mood: "anxious",
-    excerpt: "Woke up early and did some breathing exercises. The counselor suggested I try journaling...",
-    fullText: "Woke up early and did some breathing exercises. The counselor suggested I try journaling as a way to process my thoughts. I think it's helping me see patterns in my mood.",
-  },
-  {
-    id: "4", date: "Sep 28, 2025", mood: "sad",
-    excerpt: "Missing home a lot today. Called my mom in the evening and that helped a bit...",
-    fullText: "Missing home a lot today. Called my mom in the evening and that helped a bit. It's hard being away during the semester. Going to reach out to a friend tomorrow.",
-  },
-  {
-    id: "5", date: "Sep 22, 2025", mood: "overwhelmed",
-    excerpt: "Three deadlines collided today. I almost broke down but used the grounding exercise...",
-    fullText: "Three deadlines collided today. I almost broke down but used the 5-4-3-2-1 grounding exercise on my phone and it calmed me down enough to finish. One day at a time.",
-  },
-];
+const EXCERPT_LENGTH   = 120;
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
 function getInitials(name: string) {
-  return name
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(w => w[0].toUpperCase())
-    .join("");
+  return name.trim().split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+}
+
+function deriveMood(moodScore: number, intent: string): Mood {
+  if (intent === "crisis") return "overwhelmed";
+  if (moodScore >= 0.4)   return "happy";
+  if (moodScore >= 0.1)   return "calm";
+  if (moodScore >= -0.2)  return "anxious";
+  if (moodScore >= -0.6)  return "sad";
+  return "overwhelmed";
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function toDisplayEntry(e: ApiEntry): JournalEntry {
+  const text = e.transcript.trim();
+  return {
+    id:         e.id,
+    date:       formatDate(e.createdAt),
+    fullText:   text,
+    excerpt:    text.length > EXCERPT_LENGTH ? text.slice(0, EXCERPT_LENGTH) + "…" : text,
+    aiResponse: e.aiResponse,
+    mood:       deriveMood(e.moodScore, e.intent),
+    inputType:  (e.inputType === "voice" ? "voice" : "text") as "text" | "voice",
+    intent:     e.intent,
+  };
+}
+
+/* ── Detail sheet ─────────────────────────────────────────────── */
+
+function JournalDetailSheet({
+  entry,
+  onClose,
+  onDelete,
+  deleting,
+}: {
+  entry: JournalEntry;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+  deleting: boolean;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  return (
+    <div
+      className="absolute inset-0 z-30 flex flex-col"
+      style={{ background: "#FCFAF7" }}
+    >
+      {/* Colour header bar */}
+      <div
+        className="shrink-0 px-5 pt-14 pb-5"
+        style={{ background: `linear-gradient(160deg, ${MOOD_COLOR[entry.mood]}CC 0%, ${MOOD_COLOR[entry.mood]}44 100%)` }}
+      >
+        {/* Top row */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/60 backdrop-blur-sm"
+            aria-label="Close"
+          >
+            <X size={17} color="#1A1A1A" />
+          </button>
+
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onDelete(entry.id)}
+                disabled={deleting}
+                className="flex items-center gap-1.5 rounded-full bg-[#D47B7B] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
+              >
+                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="rounded-full bg-white/60 px-3 py-1.5 text-[12px] font-medium text-[#555] backdrop-blur-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/60 backdrop-blur-sm text-[#C8C0D0] hover:text-[#D47B7B]"
+              aria-label="Delete entry"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Meta */}
+        <div className="mt-4 flex items-end gap-3">
+          <div
+            className="h-12 w-12 shrink-0 rounded-[14px]"
+            style={{ backgroundColor: MOOD_COLOR[entry.mood] }}
+          />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-semibold text-[#1A1A1A]">{entry.date}</span>
+              <span
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{
+                  backgroundColor: entry.inputType === "voice" ? "rgba(124,58,237,0.12)" : "rgba(123,94,167,0.12)",
+                  color: entry.inputType === "voice" ? "#7C3AED" : "#7B5EA7",
+                }}
+              >
+                {entry.inputType === "voice" ? <Mic size={9} /> : <FileText size={9} />}
+                {entry.inputType}
+              </span>
+            </div>
+            <span
+              className="text-[12px] font-medium capitalize"
+              style={{ color: "#7B5EA7" }}
+            >
+              {MOOD_LABEL[entry.mood]} · {entry.intent}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 pb-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Entry text */}
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[#B8B0A7]">Your entry</p>
+          <p className="whitespace-pre-wrap text-[14px] leading-[1.65] text-[#1A1A1A]">
+            {entry.fullText}
+          </p>
+        </div>
+
+        {/* Tala response */}
+        {entry.aiResponse && (
+          <div
+            className="rounded-[16px] px-4 py-4"
+            style={{ background: "linear-gradient(135deg, #EDE0F8 0%, #F5EEFF 100%)" }}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                style={{ backgroundColor: "#7B5EA7" }}
+              >
+                T
+              </div>
+              <span className="text-[12px] font-semibold text-[#7B5EA7]">Tala</span>
+            </div>
+            <p className="whitespace-pre-wrap text-[13px] leading-[1.65] text-[#3B1F5E]">
+              {entry.aiResponse}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ── Main page ────────────────────────────────────────────────── */
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser]       = useState<StoredUser | null>(null);
-  const [entries, setEntries] = useState<JournalEntry[]>(INITIAL_ENTRIES);
+  const [user, setUser]             = useState<StoredUser | null>(null);
+  const [entries, setEntries]       = useState<JournalEntry[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [confirmId, setConfirmId]   = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage]             = useState(0);
-
-  /* Bio edit state */
-  const [bio, setBio]         = useState("Add a short bio…");
-  const [editingBio, setEditingBio] = useState(false);
-  const [bioInput, setBioInput]     = useState("");
-  const bioRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const stored = loadUser();
@@ -102,19 +245,32 @@ export default function ProfilePage() {
     setUser(stored);
   }, [router]);
 
-  /* Bio edit handlers */
-  const startEdit = () => {
-    setBioInput(bio === "Add a short bio…" ? "" : bio);
-    setEditingBio(true);
-    setTimeout(() => bioRef.current?.focus(), 50);
-  };
-  const saveBio = () => {
-    setBio(bioInput.trim() || "Add a short bio…");
-    setEditingBio(false);
-  };
+  const fetchEntries = useCallback(async (userId: number) => {
+    setLoading(true);
+    setFetchError(false);
+    try {
+      const res = await fetch("/api/journal", {
+        headers: { "x-user-id": String(userId) },
+      });
+      if (!res.ok) throw new Error("fetch failed");
+      const data = (await res.json()) as { entries: ApiEntry[] };
+      setEntries(data.entries.map(toDisplayEntry));
+    } catch {
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = loadUser();
+    if (!stored) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate entries after mount
+    void fetchEntries(stored.id);
+  }, [fetchEntries]);
 
   /* Pagination */
-  const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
+  const totalPages  = Math.ceil(entries.length / ENTRIES_PER_PAGE);
   const pageEntries = entries.slice(page * ENTRIES_PER_PAGE, page * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE);
 
   const handleLogout = () => {
@@ -122,14 +278,27 @@ export default function ProfilePage() {
     router.replace("/login");
   };
 
-  const handleDelete = (id: string) => {
-    const next = entries.filter(e => e.id !== id);
-    setEntries(next);
-    setConfirmId(null);
-    setExpandedId(null);
-    /* If deleting last item on the page, step back */
-    const newTotal = Math.ceil(next.length / ENTRIES_PER_PAGE);
-    if (page >= newTotal && page > 0) setPage(p => p - 1);
+  const handleDelete = async (id: string) => {
+    const stored = loadUser();
+    if (!stored) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/journal/${id}`, {
+        method:  "DELETE",
+        headers: { "x-user-id": String(stored.id) },
+      });
+      if (!res.ok) throw new Error("delete failed");
+      const next = entries.filter(e => e.id !== id);
+      setEntries(next);
+      setConfirmId(null);
+      setSelectedEntry(null);
+      const newTotal = Math.ceil(next.length / ENTRIES_PER_PAGE);
+      if (page >= newTotal && page > 0) setPage(p => p - 1);
+    } catch {
+      /* silently ignore – keep UI consistent */
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (!user) return null;
@@ -149,7 +318,7 @@ export default function ProfilePage() {
               Profile
             </h1>
             <p className="mt-0.5 text-[14px] text-[#B8B0A7]">
-              {greeting}, {user.name.split(" ")[0]} ✦
+              {greeting} {user.name.split(" ")[0]} ✦
             </p>
           </div>
 
@@ -170,7 +339,6 @@ export default function ProfilePage() {
             className="flex items-start gap-4 rounded-[22px] px-5 py-5"
             style={{ background: "linear-gradient(135deg, #D8BFF0 0%, #EDE0F8 100%)" }}
           >
-            {/* Avatar */}
             <div
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[17px] font-bold text-white"
               style={{ backgroundColor: "#7B5EA7" }}
@@ -178,46 +346,9 @@ export default function ProfilePage() {
               {initials}
             </div>
 
-            {/* Info */}
             <div className="flex flex-1 flex-col gap-1">
               <p className="text-[17px] font-bold leading-none text-[#2A1A4A]">{user.name}</p>
               <p className="text-[12px] text-[#7B5EA7]">{user.email}</p>
-
-              {/* Editable bio */}
-              <div className="mt-2">
-                {editingBio ? (
-                  <div className="flex flex-col gap-2">
-                    <textarea
-                      ref={bioRef}
-                      value={bioInput}
-                      onChange={e => setBioInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveBio(); } }}
-                      rows={2}
-                      placeholder="Write something about yourself…"
-                      className="w-full resize-none rounded-[10px] bg-white/50 px-3 py-2 text-[12px] leading-relaxed text-[#2A1A4A] outline-none placeholder:text-[#A881C2]/50"
-                    />
-                    <button
-                      onClick={saveBio}
-                      className="flex w-fit items-center gap-1 rounded-full bg-[#7B5EA7] px-3 py-1.5 text-[11px] font-semibold text-white"
-                    >
-                      <Check size={11} /> Save
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={startEdit}
-                    className="flex items-start gap-1.5 text-left"
-                  >
-                    <span
-                      className="text-[12px] leading-relaxed"
-                      style={{ color: bio === "Add a short bio…" ? "rgba(123,94,167,0.5)" : "#3B1F5E" }}
-                    >
-                      {bio}
-                    </span>
-                    <Pencil size={11} className="mt-0.5 shrink-0" color="#7B5EA7" />
-                  </button>
-                )}
-              </div>
             </div>
           </div>
 
@@ -225,12 +356,32 @@ export default function ProfilePage() {
           <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-[16px] font-bold text-[#1A1A1A]">My Journal Entries</h2>
-              <span className="text-[13px] font-medium" style={{ color: "#A881C2" }}>
-                {entries.length} {entries.length === 1 ? "entry" : "entries"}
-              </span>
+              {!loading && !fetchError && (
+                <span className="text-[13px] font-medium" style={{ color: "#A881C2" }}>
+                  {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                </span>
+              )}
             </div>
 
-            {entries.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 size={22} className="animate-spin text-[#A881C2]" />
+              </div>
+            ) : fetchError ? (
+              <div
+                className="flex flex-col items-center gap-3 rounded-[18px] py-10 text-center"
+                style={{ border: "1px dashed #E5DDEF" }}
+              >
+                <span className="text-[32px]">⚠️</span>
+                <p className="text-[14px] text-[#B8B0A7]">Couldn&apos;t load entries.</p>
+                <button
+                  onClick={() => user && void fetchEntries(user.id)}
+                  className="rounded-full bg-[#EDE5F5] px-4 py-2 text-[13px] font-medium text-[#7B5EA7]"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : entries.length === 0 ? (
               <div
                 className="flex flex-col items-center gap-2 rounded-[18px] py-10 text-center"
                 style={{ border: "1px dashed #E5DDEF" }}
@@ -253,27 +404,41 @@ export default function ProfilePage() {
                           style={{ backgroundColor: MOOD_COLOR[entry.mood] }}
                         />
 
-                        {/* Text */}
+                        {/* Tappable text area → opens detail */}
                         <button
                           className="flex flex-1 flex-col gap-0.5 text-left"
-                          onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                          onClick={() => setSelectedEntry(entry)}
                         >
-                          <span className="text-[12px] font-medium" style={{ color: "#A881C2" }}>
-                            {entry.date}
-                          </span>
-                          <span className="text-[13px] leading-snug text-[#333333] line-clamp-2">
-                            {expandedId === entry.id ? entry.fullText : entry.excerpt}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12px] font-medium" style={{ color: "#A881C2" }}>
+                              {entry.date}
+                            </span>
+                            <span
+                              className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize"
+                              style={{
+                                backgroundColor: entry.inputType === "voice" ? "rgba(139,92,246,0.10)" : "rgba(168,129,194,0.10)",
+                                color:           entry.inputType === "voice" ? "#7C3AED" : "#7B5EA7",
+                              }}
+                            >
+                              {entry.inputType === "voice" ? <Mic size={8} /> : <FileText size={8} />}
+                              {entry.inputType}
+                            </span>
+                          </div>
+                          <span className="line-clamp-2 text-[13px] leading-snug text-[#333333]">
+                            {entry.excerpt}
                           </span>
                         </button>
 
-                        {/* Actions */}
+                        {/* Delete action */}
                         <div className="flex shrink-0 items-center gap-1 pt-1">
                           {confirmId === entry.id ? (
                             <div className="flex items-center gap-1.5">
                               <button
-                                onClick={() => handleDelete(entry.id)}
-                                className="rounded-[8px] bg-[#D47B7B] px-2.5 py-1 text-[11px] font-semibold text-white"
+                                onClick={() => void handleDelete(entry.id)}
+                                disabled={deletingId === entry.id}
+                                className="flex items-center gap-1 rounded-[8px] bg-[#D47B7B] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-60"
                               >
+                                {deletingId === entry.id && <Loader2 size={11} className="animate-spin" />}
                                 Delete
                               </button>
                               <button
@@ -285,22 +450,13 @@ export default function ProfilePage() {
                               </button>
                             </div>
                           ) : (
-                            <>
-                              <button
-                                onClick={() => setConfirmId(entry.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[#C8C0D0] transition-colors hover:text-[#D47B7B]"
-                                aria-label="Delete"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                              <button
-                                onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[#C8C0D0]"
-                                aria-label="View"
-                              >
-                                <ChevronRight size={16} />
-                              </button>
-                            </>
+                            <button
+                              onClick={() => setConfirmId(entry.id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[#C8C0D0] transition-colors hover:text-[#D47B7B]"
+                              aria-label="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -319,26 +475,16 @@ export default function ProfilePage() {
                       onClick={() => setPage(p => p - 1)}
                       disabled={page === 0}
                       className="rounded-[12px] px-4 py-2 text-[13px] font-medium transition-all disabled:opacity-30"
-                      style={{
-                        backgroundColor: "rgba(168,129,194,0.1)",
-                        color: "#7B5EA7",
-                      }}
+                      style={{ backgroundColor: "rgba(168,129,194,0.1)", color: "#7B5EA7" }}
                     >
                       ← Prev
                     </button>
-
-                    <span className="text-[12px] text-[#B8B0A7]">
-                      {page + 1} / {totalPages}
-                    </span>
-
+                    <span className="text-[12px] text-[#B8B0A7]">{page + 1} / {totalPages}</span>
                     <button
                       onClick={() => setPage(p => p + 1)}
                       disabled={page >= totalPages - 1}
                       className="rounded-[12px] px-4 py-2 text-[13px] font-medium transition-all disabled:opacity-30"
-                      style={{
-                        backgroundColor: "rgba(168,129,194,0.1)",
-                        color: "#7B5EA7",
-                      }}
+                      style={{ backgroundColor: "rgba(168,129,194,0.1)", color: "#7B5EA7" }}
                     >
                       Next →
                     </button>
@@ -387,6 +533,16 @@ export default function ProfilePage() {
         </div>
 
         <BottomNav />
+
+        {/* ── Journal detail overlay ── */}
+        {selectedEntry && (
+          <JournalDetailSheet
+            entry={selectedEntry}
+            onClose={() => setSelectedEntry(null)}
+            onDelete={handleDelete}
+            deleting={deletingId === selectedEntry.id}
+          />
+        )}
       </div>
     </main>
   );

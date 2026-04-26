@@ -147,7 +147,7 @@ export function AiResponseCard({
               isCrisis ? "text-[#8A3A2E]" : "text-[#2F5C47]",
             ].join(" ")}
           >
-            {isCrisis ? "Support" : "AI Companion"}
+            {isCrisis ? "Support" : "Tala"}
           </span>
           <span
             className={[
