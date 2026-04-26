@@ -9,7 +9,7 @@ export default function WellnessPage() {
       <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden rounded-[40px] bg-[#FCFAF7]">
         <div className="h-[50px] shrink-0" aria-hidden />
 
-        <WellnessPageHeader title="Wellness" />
+        <WellnessPageHeader title="Wellness" showBack={false} />
 
         <div className="flex items-center justify-between px-5 pb-4 pt-6">
           <h2 className="text-[17px] font-bold leading-tight text-[#2A2A2A]">
