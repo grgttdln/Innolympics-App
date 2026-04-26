@@ -65,7 +65,7 @@ export function GuidedPromptRunner({ title, prompts }: Props) {
     setSubmitError(null);
     try {
       const transcript = buildGuidedTranscript(prompts, answers);
-      const res = await fetch("/api/journal", {
+      const res = await fetch("/api/journal/save-only", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -77,8 +77,18 @@ export function GuidedPromptRunner({ title, prompts }: Props) {
         setSubmitError("Something went wrong. Please try again.");
         return;
       }
-      const data = (await res.json()) as JournalApiResponse;
-      setAiReply(data);
+      const { entry_id } = (await res.json()) as { entry_id: string };
+      setAiReply({
+        intent: "reflection",
+        severity: 0,
+        mood_score: 0,
+        emotions: [],
+        response:
+          "Thanks for checking in with yourself today. Small moments of reflection add up — keep going at your own pace.",
+        flagged: false,
+        needs_escalation: false,
+        entry_id,
+      });
       setInsightsOpen(true);
     } catch {
       setSubmitError("Something went wrong. Please try again.");
