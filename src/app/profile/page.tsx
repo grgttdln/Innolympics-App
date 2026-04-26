@@ -6,6 +6,7 @@ import {
   Trash2, Phone, LogOut, Loader2, X, Mic, FileText,
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { AiInsightCard } from "@/components/ai-insight-card";
 import { loadUser, clearUser, type StoredUser } from "@/lib/session";
 import { getGreeting } from "@/lib/greeting";
 
@@ -40,29 +41,29 @@ type ApiEntry = {
 /* ── Config ───────────────────────────────────────────────────── */
 
 const MOOD_COLOR: Record<Mood, string> = {
-  calm:        "#D4B5E8",
-  happy:       "#B5E8C8",
-  anxious:     "#F5D5A8",
-  sad:         "#B5CCE8",
+  calm: "#D4B5E8",
+  happy: "#B5E8C8",
+  anxious: "#F5D5A8",
+  sad: "#B5CCE8",
   overwhelmed: "#F0B5B5",
 };
 
 const MOOD_LABEL: Record<Mood, string> = {
-  calm:        "Calm",
-  happy:       "Happy",
-  anxious:     "Anxious",
-  sad:         "Sad",
+  calm: "Calm",
+  happy: "Happy",
+  anxious: "Anxious",
+  sad: "Sad",
   overwhelmed: "Overwhelmed",
 };
 
 const HOTLINES = [
-  { name: "DOH Mental Health Crisis Line", number: "1553",           tel: "1553" },
-  { name: "NCMH Crisis Line (USAP)",       number: "0917-899-8727",  tel: "09178998727" },
-  { name: "In Touch Crisis Line",          number: "(02) 8893-7603", tel: "0288937603" },
+  { name: "DOH Mental Health Crisis Line", number: "1553", tel: "1553" },
+  { name: "NCMH Crisis Line (USAP)", number: "0917-899-8727", tel: "09178998727" },
+  { name: "In Touch Crisis Line", number: "(02) 8893-7603", tel: "0288937603" },
 ];
 
 const ENTRIES_PER_PAGE = 3;
-const EXCERPT_LENGTH   = 120;
+const EXCERPT_LENGTH = 120;
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
@@ -72,10 +73,10 @@ function getInitials(name: string) {
 
 function deriveMood(moodScore: number, intent: string): Mood {
   if (intent === "crisis") return "overwhelmed";
-  if (moodScore >= 0.4)   return "happy";
-  if (moodScore >= 0.1)   return "calm";
-  if (moodScore >= -0.2)  return "anxious";
-  if (moodScore >= -0.6)  return "sad";
+  if (moodScore >= 0.4) return "happy";
+  if (moodScore >= 0.1) return "calm";
+  if (moodScore >= -0.2) return "anxious";
+  if (moodScore >= -0.6) return "sad";
   return "overwhelmed";
 }
 
@@ -86,14 +87,14 @@ function formatDate(iso: string): string {
 function toDisplayEntry(e: ApiEntry): JournalEntry {
   const text = e.transcript.trim();
   return {
-    id:         e.id,
-    date:       formatDate(e.createdAt),
-    fullText:   text,
-    excerpt:    text.length > EXCERPT_LENGTH ? text.slice(0, EXCERPT_LENGTH) + "…" : text,
+    id: e.id,
+    date: formatDate(e.createdAt),
+    fullText: text,
+    excerpt: text.length > EXCERPT_LENGTH ? text.slice(0, EXCERPT_LENGTH) + "…" : text,
     aiResponse: e.aiResponse,
-    mood:       deriveMood(e.moodScore, e.intent),
-    inputType:  (e.inputType === "voice" ? "voice" : "text") as "text" | "voice",
-    intent:     e.intent,
+    mood: deriveMood(e.moodScore, e.intent),
+    inputType: (e.inputType === "voice" ? "voice" : "text") as "text" | "voice",
+    intent: e.intent,
   };
 }
 
@@ -229,14 +230,14 @@ function JournalDetailSheet({
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser]             = useState<StoredUser | null>(null);
-  const [entries, setEntries]       = useState<JournalEntry[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
-  const [confirmId, setConfirmId]   = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [page, setPage]             = useState(0);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     const stored = loadUser();
@@ -270,7 +271,7 @@ export default function ProfilePage() {
   }, [fetchEntries]);
 
   /* Pagination */
-  const totalPages  = Math.ceil(entries.length / ENTRIES_PER_PAGE);
+  const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
   const pageEntries = entries.slice(page * ENTRIES_PER_PAGE, page * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE);
 
   const handleLogout = () => {
@@ -284,7 +285,7 @@ export default function ProfilePage() {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/journal/${id}`, {
-        method:  "DELETE",
+        method: "DELETE",
         headers: { "x-user-id": String(stored.id) },
       });
       if (!res.ok) throw new Error("delete failed");
@@ -352,6 +353,9 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* AI Insight card */}
+          <AiInsightCard userId={user.id} />
+
           {/* Journal entries */}
           <section>
             <div className="mb-3 flex items-center justify-between">
@@ -417,7 +421,7 @@ export default function ProfilePage() {
                               className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize"
                               style={{
                                 backgroundColor: entry.inputType === "voice" ? "rgba(139,92,246,0.10)" : "rgba(168,129,194,0.10)",
-                                color:           entry.inputType === "voice" ? "#7C3AED" : "#7B5EA7",
+                                color: entry.inputType === "voice" ? "#7C3AED" : "#7B5EA7",
                               }}
                             >
                               {entry.inputType === "voice" ? <Mic size={8} /> : <FileText size={8} />}
