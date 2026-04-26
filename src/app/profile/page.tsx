@@ -1,13 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Trash2, Phone, LogOut, Loader2, X, Mic, FileText,
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { TalaInsightDialog } from "@/components/tala-insight-card";
 import { loadUser, clearUser, type StoredUser } from "@/lib/session";
 import { getGreeting } from "@/lib/greeting";
+import { detectTalaInsight } from "@/lib/profile/tala-insight";
+
+const TALA_INSIGHT_DISMISS_KEY = "tala-insight-dismissed";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -55,10 +59,41 @@ const MOOD_LABEL: Record<Mood, string> = {
   overwhelmed: "Overwhelmed",
 };
 
-const HOTLINES = [
-  { name: "DOH Mental Health Crisis Line", number: "1553",           tel: "1553" },
-  { name: "NCMH Crisis Line (USAP)",       number: "0917-899-8727",  tel: "09178998727" },
-  { name: "In Touch Crisis Line",          number: "(02) 8893-7603", tel: "0288937603" },
+const HOTLINE_GROUPS = [
+  {
+    name: "NCMH Crisis Hotline",
+    meta: "24/7 · free",
+    numbers: [
+      { label: "Nationwide landline",  number: "1553",             tel: "1553" },
+      { label: "Toll-free",             number: "1800-1888-1553",   tel: "180018881553" },
+      { label: "Globe / TM",            number: "0917-899-8727",    tel: "09178998727" },
+      { label: "Globe / TM",            number: "0966-351-4518",    tel: "09663514518" },
+      { label: "Smart / Sun / TNT",     number: "0908-639-2672",    tel: "09086392672" },
+      { label: "Smart / Sun / TNT",     number: "0919-057-1553",    tel: "09190571553" },
+    ],
+  },
+  {
+    name: "In Touch Crisis Line",
+    meta: "24/7 · free & anonymous",
+    numbers: [
+      { label: "Landline",  number: "(02) 8893-1893",  tel: "0288931893" },
+      { label: "Landline",  number: "(02) 893-7603",   tel: "028937603" },
+      { label: "Globe",     number: "0917-800-1123",   tel: "09178001123" },
+      { label: "Globe",     number: "0917-863-1136",   tel: "09178631136" },
+      { label: "Smart",     number: "0922-893-8944",   tel: "09228938944" },
+      { label: "Smart",     number: "0998-841-0053",   tel: "09988410053" },
+    ],
+  },
+  {
+    name: "DOH Hopeline",
+    meta: "24/7 · suicide prevention",
+    numbers: [
+      { label: "Globe / TM",  number: "2919",            tel: "2919" },
+      { label: "Landline",    number: "(02) 8804-4673",  tel: "0288044673" },
+      { label: "Globe",       number: "0917-558-4673",   tel: "09175584673" },
+      { label: "Smart",       number: "0918-873-4673",   tel: "09188734673" },
+    ],
+  },
 ];
 
 const ENTRIES_PER_PAGE = 3;
@@ -237,6 +272,9 @@ export default function ProfilePage() {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage]             = useState(0);
+  const [insightDismissed, setInsightDismissed] = useState(false);
+  const [insightOpen, setInsightOpen] = useState(false);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = loadUser();
@@ -244,6 +282,24 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
     setUser(stored);
   }, [router]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate dismissal flag on mount
+    setInsightDismissed(
+      typeof window !== "undefined" &&
+        window.sessionStorage.getItem(TALA_INSIGHT_DISMISS_KEY) === "1",
+    );
+  }, []);
+
+  const handleInsightOpenChange = (next: boolean) => {
+    setInsightOpen(next);
+    if (!next) {
+      setInsightDismissed(true);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(TALA_INSIGHT_DISMISS_KEY, "1");
+      }
+    }
+  };
 
   const fetchEntries = useCallback(async (userId: number) => {
     setLoading(true);
@@ -268,6 +324,14 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate entries after mount
     void fetchEntries(stored.id);
   }, [fetchEntries]);
+
+  useEffect(() => {
+    if (loading || fetchError || insightDismissed) return;
+    const detected = detectTalaInsight(entries);
+    if (!detected) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-open once entries load and a pattern is present
+    setInsightOpen(true);
+  }, [loading, fetchError, insightDismissed, entries]);
 
   /* Pagination */
   const totalPages  = Math.ceil(entries.length / ENTRIES_PER_PAGE);
@@ -306,9 +370,32 @@ export default function ProfilePage() {
   const initials = getInitials(user.name);
   const greeting = getGreeting(new Date());
 
+  const insight =
+    !loading && !fetchError && !insightDismissed
+      ? detectTalaInsight(entries)
+      : null;
+
+  const insightChips = insight
+    ? insight.contributingEntries
+        .map((c) => {
+          const full = entries.find((e) => e.id === c.id);
+          if (!full) return null;
+          return {
+            id: full.id,
+            date: full.date,
+            mood: full.mood,
+            moodLabel: MOOD_LABEL[full.mood],
+          };
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+    : [];
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-      <div className="relative flex h-[844px] w-[390px] flex-col overflow-hidden rounded-[40px] bg-[#FCFAF7]">
+      <div
+        ref={frameRef}
+        className="relative flex h-[844px] w-[390px] flex-col overflow-hidden rounded-[40px] bg-[#FCFAF7]"
+      >
         <div className="h-[50px] shrink-0" aria-hidden />
 
         {/* ── Page header ── */}
@@ -398,11 +485,22 @@ export default function ProfilePage() {
                   {pageEntries.map((entry, i) => (
                     <div key={entry.id}>
                       <div className="flex items-start gap-3 px-4 py-3.5">
-                        {/* Mood square */}
+                        {/* Mood square with input-type badge */}
                         <div
-                          className="mt-0.5 h-11 w-11 shrink-0 rounded-[12px]"
+                          className="relative mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px]"
                           style={{ backgroundColor: MOOD_COLOR[entry.mood] }}
-                        />
+                        >
+                          <span
+                            aria-label={entry.inputType === "voice" ? "Voice entry" : "Text entry"}
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[#5B3D78] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+                          >
+                            {entry.inputType === "voice" ? (
+                              <Mic size={13} strokeWidth={2} />
+                            ) : (
+                              <FileText size={13} strokeWidth={2} />
+                            )}
+                          </span>
+                        </div>
 
                         {/* Tappable text area → opens detail */}
                         <button
@@ -498,13 +596,14 @@ export default function ProfilePage() {
           <section>
             <h2 className="mb-3 text-[16px] font-bold text-[#1A1A1A]">Mental Health Hotlines</h2>
 
-            <div
-              className="flex flex-col overflow-hidden rounded-[18px] bg-white"
-              style={{ border: "1px solid #EDE5F5", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
-            >
-              {HOTLINES.map((h, i) => (
-                <div key={h.tel}>
-                  <div className="flex items-center gap-3 px-4 py-4">
+            <div className="flex flex-col gap-3">
+              {HOTLINE_GROUPS.map((group) => (
+                <div
+                  key={group.name}
+                  className="flex flex-col overflow-hidden rounded-[18px] bg-white"
+                  style={{ border: "1px solid #EDE5F5", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+                >
+                  <div className="flex items-center gap-3 px-4 pb-2 pt-4">
                     <div
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                       style={{ backgroundColor: "rgba(168,129,194,0.12)" }}
@@ -512,20 +611,36 @@ export default function ProfilePage() {
                       <Phone size={16} color="#A881C2" />
                     </div>
                     <div className="flex flex-1 flex-col gap-0.5">
-                      <p className="text-[13px] font-semibold leading-none text-[#1A1A1A]">{h.name}</p>
-                      <p className="text-[12px]" style={{ color: "#A881C2" }}>{h.number}</p>
+                      <p className="text-[13px] font-semibold leading-none text-[#1A1A1A]">{group.name}</p>
+                      <p className="text-[11px]" style={{ color: "#A881C2" }}>{group.meta}</p>
                     </div>
-                    <a
-                      href={`tel:${h.tel}`}
-                      className="rounded-full px-4 py-2 text-[13px] font-semibold text-white transition-all active:scale-[0.97]"
-                      style={{ backgroundColor: "#7B5EA7" }}
-                    >
-                      Call
-                    </a>
                   </div>
-                  {i < HOTLINES.length - 1 && (
-                    <div className="mx-4 h-px" style={{ backgroundColor: "#F0E8F8" }} />
-                  )}
+
+                  <ul className="flex flex-col">
+                    {group.numbers.map((n, ni) => (
+                      <li key={n.tel}>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <div className="flex flex-1 flex-col">
+                            <span className="text-[13px] font-semibold leading-tight text-[#1A1A1A]">
+                              {n.number}
+                            </span>
+                            <span className="text-[11px] text-[#B8B0A7]">{n.label}</span>
+                          </div>
+                          <a
+                            href={`tel:${n.tel}`}
+                            aria-label={`Call ${group.name} at ${n.number}`}
+                            className="rounded-full px-3.5 py-1.5 text-[12px] font-semibold text-white transition-all active:scale-[0.97]"
+                            style={{ backgroundColor: "#7B5EA7" }}
+                          >
+                            Call
+                          </a>
+                        </div>
+                        {ni < group.numbers.length - 1 ? (
+                          <div className="mx-4 h-px" style={{ backgroundColor: "#F0E8F8" }} />
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>
@@ -543,6 +658,15 @@ export default function ProfilePage() {
             deleting={deletingId === selectedEntry.id}
           />
         )}
+
+        <TalaInsightDialog
+          open={insightOpen}
+          onOpenChange={handleInsightOpenChange}
+          insight={insight}
+          chipEntries={insightChips}
+          hotlineGroups={HOTLINE_GROUPS}
+          container={frameRef}
+        />
       </div>
     </main>
   );
