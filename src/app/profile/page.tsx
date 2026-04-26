@@ -265,6 +265,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const stored = loadUser();
     if (!stored) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate entries after mount
     void fetchEntries(stored.id);
   }, [fetchEntries]);
 
@@ -372,7 +373,7 @@ export default function ProfilePage() {
                 style={{ border: "1px dashed #E5DDEF" }}
               >
                 <span className="text-[32px]">⚠️</span>
-                <p className="text-[14px] text-[#B8B0A7]">Couldn't load entries.</p>
+                <p className="text-[14px] text-[#B8B0A7]">Couldn&apos;t load entries.</p>
                 <button
                   onClick={() => user && void fetchEntries(user.id)}
                   className="rounded-full bg-[#EDE5F5] px-4 py-2 text-[13px] font-medium text-[#7B5EA7]"
