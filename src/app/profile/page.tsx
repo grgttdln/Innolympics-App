@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Trash2, Phone, LogOut, Loader2, X, Mic, FileText,
+  Trash2, Phone, LogOut, Loader2, X, Mic, FileText, ShieldCheck,
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { AiInsightCard } from "@/components/ai-insight-card";
 import { loadUser, clearUser, type StoredUser } from "@/lib/session";
 import { getGreeting } from "@/lib/greeting";
 
@@ -37,32 +38,39 @@ type ApiEntry = {
   createdAt: string;
 };
 
+type FeedbackItem = {
+  reviewId: string;
+  entryId: string;
+  comment: string;
+  reviewedAt: string;
+};
+
 /* ── Config ───────────────────────────────────────────────────── */
 
 const MOOD_COLOR: Record<Mood, string> = {
-  calm:        "#D4B5E8",
-  happy:       "#B5E8C8",
-  anxious:     "#F5D5A8",
-  sad:         "#B5CCE8",
+  calm: "#D4B5E8",
+  happy: "#B5E8C8",
+  anxious: "#F5D5A8",
+  sad: "#B5CCE8",
   overwhelmed: "#F0B5B5",
 };
 
 const MOOD_LABEL: Record<Mood, string> = {
-  calm:        "Calm",
-  happy:       "Happy",
-  anxious:     "Anxious",
-  sad:         "Sad",
+  calm: "Calm",
+  happy: "Happy",
+  anxious: "Anxious",
+  sad: "Sad",
   overwhelmed: "Overwhelmed",
 };
 
 const HOTLINES = [
-  { name: "DOH Mental Health Crisis Line", number: "1553",           tel: "1553" },
-  { name: "NCMH Crisis Line (USAP)",       number: "0917-899-8727",  tel: "09178998727" },
-  { name: "In Touch Crisis Line",          number: "(02) 8893-7603", tel: "0288937603" },
+  { name: "DOH Mental Health Crisis Line", number: "1553", tel: "1553" },
+  { name: "NCMH Crisis Line (USAP)", number: "0917-899-8727", tel: "09178998727" },
+  { name: "In Touch Crisis Line", number: "(02) 8893-7603", tel: "0288937603" },
 ];
 
 const ENTRIES_PER_PAGE = 3;
-const EXCERPT_LENGTH   = 120;
+const EXCERPT_LENGTH = 120;
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
@@ -72,10 +80,10 @@ function getInitials(name: string) {
 
 function deriveMood(moodScore: number, intent: string): Mood {
   if (intent === "crisis") return "overwhelmed";
-  if (moodScore >= 0.4)   return "happy";
-  if (moodScore >= 0.1)   return "calm";
-  if (moodScore >= -0.2)  return "anxious";
-  if (moodScore >= -0.6)  return "sad";
+  if (moodScore >= 0.4) return "happy";
+  if (moodScore >= 0.1) return "calm";
+  if (moodScore >= -0.2) return "anxious";
+  if (moodScore >= -0.6) return "sad";
   return "overwhelmed";
 }
 
@@ -86,14 +94,14 @@ function formatDate(iso: string): string {
 function toDisplayEntry(e: ApiEntry): JournalEntry {
   const text = e.transcript.trim();
   return {
-    id:         e.id,
-    date:       formatDate(e.createdAt),
-    fullText:   text,
-    excerpt:    text.length > EXCERPT_LENGTH ? text.slice(0, EXCERPT_LENGTH) + "…" : text,
+    id: e.id,
+    date: formatDate(e.createdAt),
+    fullText: text,
+    excerpt: text.length > EXCERPT_LENGTH ? text.slice(0, EXCERPT_LENGTH) + "…" : text,
     aiResponse: e.aiResponse,
-    mood:       deriveMood(e.moodScore, e.intent),
-    inputType:  (e.inputType === "voice" ? "voice" : "text") as "text" | "voice",
-    intent:     e.intent,
+    mood: deriveMood(e.moodScore, e.intent),
+    inputType: (e.inputType === "voice" ? "voice" : "text") as "text" | "voice",
+    intent: e.intent,
   };
 }
 
@@ -104,11 +112,13 @@ function JournalDetailSheet({
   onClose,
   onDelete,
   deleting,
+  feedback,
 }: {
   entry: JournalEntry;
   onClose: () => void;
   onDelete: (id: string) => void;
   deleting: boolean;
+  feedback?: FeedbackItem;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -220,6 +230,27 @@ function JournalDetailSheet({
             </p>
           </div>
         )}
+
+        {/* Professional's Note */}
+        {feedback && (
+          <div
+            className="rounded-[16px] px-4 py-4"
+            style={{ background: "linear-gradient(135deg, #D7F0E0 0%, #EAF7EE 100%)" }}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-full text-white"
+                style={{ backgroundColor: "#4F8A6E" }}
+              >
+                <ShieldCheck size={13} />
+              </div>
+              <span className="text-[12px] font-semibold text-[#2F5C47]">Professional&apos;s Note</span>
+            </div>
+            <p className="whitespace-pre-wrap text-[13px] leading-[1.65] text-[#1A3D2E]">
+              {feedback.comment}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -229,14 +260,15 @@ function JournalDetailSheet({
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser]             = useState<StoredUser | null>(null);
-  const [entries, setEntries]       = useState<JournalEntry[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
-  const [confirmId, setConfirmId]   = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [page, setPage]             = useState(0);
+  const [page, setPage] = useState(0);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackItem>>({});
 
   useEffect(() => {
     const stored = loadUser();
@@ -262,15 +294,33 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const fetchFeedback = useCallback(async (userId: number) => {
+    try {
+      const res = await fetch("/api/professional/feedback", {
+        headers: { "x-user-id": String(userId) },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { feedback: FeedbackItem[] };
+      const map: Record<string, FeedbackItem> = {};
+      for (const fb of data.feedback) {
+        map[fb.entryId] = fb;
+      }
+      setFeedbackMap(map);
+    } catch {
+      /* silent */
+    }
+  }, []);
+
   useEffect(() => {
     const stored = loadUser();
     if (!stored) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate entries after mount
     void fetchEntries(stored.id);
-  }, [fetchEntries]);
+    void fetchFeedback(stored.id);
+  }, [fetchEntries, fetchFeedback]);
 
   /* Pagination */
-  const totalPages  = Math.ceil(entries.length / ENTRIES_PER_PAGE);
+  const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
   const pageEntries = entries.slice(page * ENTRIES_PER_PAGE, page * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE);
 
   const handleLogout = () => {
@@ -284,7 +334,7 @@ export default function ProfilePage() {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/journal/${id}`, {
-        method:  "DELETE",
+        method: "DELETE",
         headers: { "x-user-id": String(stored.id) },
       });
       if (!res.ok) throw new Error("delete failed");
@@ -352,6 +402,9 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* AI Insight card */}
+          <AiInsightCard userId={user.id} />
+
           {/* Journal entries */}
           <section>
             <div className="mb-3 flex items-center justify-between">
@@ -417,7 +470,7 @@ export default function ProfilePage() {
                               className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize"
                               style={{
                                 backgroundColor: entry.inputType === "voice" ? "rgba(139,92,246,0.10)" : "rgba(168,129,194,0.10)",
-                                color:           entry.inputType === "voice" ? "#7C3AED" : "#7B5EA7",
+                                color: entry.inputType === "voice" ? "#7C3AED" : "#7B5EA7",
                               }}
                             >
                               {entry.inputType === "voice" ? <Mic size={8} /> : <FileText size={8} />}
@@ -541,6 +594,7 @@ export default function ProfilePage() {
             onClose={() => setSelectedEntry(null)}
             onDelete={handleDelete}
             deleting={deletingId === selectedEntry.id}
+            feedback={feedbackMap[selectedEntry.id]}
           />
         )}
       </div>

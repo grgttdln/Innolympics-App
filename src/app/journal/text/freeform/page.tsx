@@ -274,13 +274,23 @@ export default function FreeformWritingPage() {
           onOpenChange={(next) => {
             setInsightsOpen(next);
             if (!next && aiReply) {
-              // After the user reads their insights and dismisses the
-              // dialog, take them back to the dashboard. `replace` so
-              // Back doesn't return to a stale freeform draft.
               router.replace("/dashboard");
             }
           }}
           reply={aiReply}
+          onConnectProfessional={() => {
+            if (!userId || !aiReply?.entry_id) return;
+            fetch("/api/professional/share", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-user-id": String(userId),
+              },
+              body: JSON.stringify({ entry_id: aiReply.entry_id }),
+            }).catch(() => {
+              /* silent — the ProfessionalHelpCard handles its own UI state */
+            });
+          }}
           container={frameRef}
         />
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 
 import { getGreeting } from "@/lib/greeting";
 
@@ -26,13 +27,7 @@ export function DashboardHeader({ name, now }: DashboardHeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F5F2ED] text-[#1A1A1A] transition-opacity hover:opacity-90 active:opacity-80"
-        >
-          <Bell className="h-5 w-5" strokeWidth={1.75} />
-        </button>
+        <NotificationBell />
         <div
           aria-label={`Profile ${trimmed || "user"}`}
           className="flex h-11 w-11 items-center justify-center rounded-full bg-[#A881C2] text-base font-semibold text-white"

@@ -135,7 +135,7 @@ function VoiceReviewPageInner() {
       const data = (await res.json()) as JournalApiResponse;
       setAiReply(data);
       setInsightsOpen(true);
-      if (id) await deleteTurns(id).catch(() => {});
+      if (id) await deleteTurns(id).catch(() => { });
     } catch {
       setSaveError("Network error. Please try again.");
     } finally {
@@ -241,6 +241,17 @@ function VoiceReviewPageInner() {
             }
           }}
           reply={aiReply}
+          onConnectProfessional={() => {
+            if (!userId || !aiReply?.entry_id) return;
+            fetch("/api/professional/share", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-user-id": String(userId),
+              },
+              body: JSON.stringify({ entry_id: aiReply.entry_id }),
+            }).catch(() => { });
+          }}
           container={frameRef}
         />
       </div>
