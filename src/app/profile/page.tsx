@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Trash2, Phone, LogOut, Loader2, X, Mic, FileText,
+  Trash2, Phone, LogOut, Loader2, X, Mic, FileText, ShieldCheck,
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { AiInsightCard } from "@/components/ai-insight-card";
@@ -36,6 +36,13 @@ type ApiEntry = {
   flagged: boolean;
   inputType: string;
   createdAt: string;
+};
+
+type FeedbackItem = {
+  reviewId: string;
+  entryId: string;
+  comment: string;
+  reviewedAt: string;
 };
 
 /* ── Config ───────────────────────────────────────────────────── */
@@ -105,11 +112,13 @@ function JournalDetailSheet({
   onClose,
   onDelete,
   deleting,
+  feedback,
 }: {
   entry: JournalEntry;
   onClose: () => void;
   onDelete: (id: string) => void;
   deleting: boolean;
+  feedback?: FeedbackItem;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -221,6 +230,27 @@ function JournalDetailSheet({
             </p>
           </div>
         )}
+
+        {/* Professional's Note */}
+        {feedback && (
+          <div
+            className="rounded-[16px] px-4 py-4"
+            style={{ background: "linear-gradient(135deg, #D7F0E0 0%, #EAF7EE 100%)" }}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-full text-white"
+                style={{ backgroundColor: "#4F8A6E" }}
+              >
+                <ShieldCheck size={13} />
+              </div>
+              <span className="text-[12px] font-semibold text-[#2F5C47]">Professional&apos;s Note</span>
+            </div>
+            <p className="whitespace-pre-wrap text-[13px] leading-[1.65] text-[#1A3D2E]">
+              {feedback.comment}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -238,6 +268,7 @@ export default function ProfilePage() {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackItem>>({});
 
   useEffect(() => {
     const stored = loadUser();
@@ -263,12 +294,30 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const fetchFeedback = useCallback(async (userId: number) => {
+    try {
+      const res = await fetch("/api/professional/feedback", {
+        headers: { "x-user-id": String(userId) },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { feedback: FeedbackItem[] };
+      const map: Record<string, FeedbackItem> = {};
+      for (const fb of data.feedback) {
+        map[fb.entryId] = fb;
+      }
+      setFeedbackMap(map);
+    } catch {
+      /* silent */
+    }
+  }, []);
+
   useEffect(() => {
     const stored = loadUser();
     if (!stored) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate entries after mount
     void fetchEntries(stored.id);
-  }, [fetchEntries]);
+    void fetchFeedback(stored.id);
+  }, [fetchEntries, fetchFeedback]);
 
   /* Pagination */
   const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
@@ -545,6 +594,7 @@ export default function ProfilePage() {
             onClose={() => setSelectedEntry(null)}
             onDelete={handleDelete}
             deleting={deletingId === selectedEntry.id}
+            feedback={feedbackMap[selectedEntry.id]}
           />
         )}
       </div>

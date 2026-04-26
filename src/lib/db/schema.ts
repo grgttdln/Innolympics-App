@@ -120,3 +120,24 @@ export const escalationEvents = pgTable(
 
 export type EscalationEvent = typeof escalationEvents.$inferSelect;
 export type NewEscalationEvent = typeof escalationEvents.$inferInsert;
+
+export const professionalReviews = pgTable(
+  "professional_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => journalEntries.id, { onDelete: "cascade" }),
+    comment: text("comment"),
+    reviewed: boolean("reviewed").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    entryIdx: index("idx_reviews_entry").on(table.entryId),
+  }),
+);
+
+export type ProfessionalReview = typeof professionalReviews.$inferSelect;
+export type NewProfessionalReview = typeof professionalReviews.$inferInsert;

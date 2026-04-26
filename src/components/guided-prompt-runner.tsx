@@ -158,6 +158,17 @@ export function GuidedPromptRunner({ title, prompts }: Props) {
             }
           }}
           reply={aiReply}
+          onConnectProfessional={() => {
+            if (!userId || !aiReply?.entry_id) return;
+            fetch("/api/professional/share", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-user-id": String(userId),
+              },
+              body: JSON.stringify({ entry_id: aiReply.entry_id }),
+            }).catch(() => { });
+          }}
           container={frameRef}
         />
 
