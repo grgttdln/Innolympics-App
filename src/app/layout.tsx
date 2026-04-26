@@ -29,7 +29,8 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const APP_NAME = "Innolympics";
-const APP_DESCRIPTION = "Innolympics app";
+const APP_DESCRIPTION =
+  "A gentle journaling and wellness companion — voice, text, and guided grounding in one calm space.";
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
@@ -39,6 +40,15 @@ export const metadata: Metadata = {
   },
   description: APP_DESCRIPTION,
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -50,7 +60,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#FCFAF7",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

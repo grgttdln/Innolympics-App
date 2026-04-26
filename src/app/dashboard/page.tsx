@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { InstallPrompt } from "@/components/install-prompt";
 import { JournalPicker } from "@/components/journal-picker";
 import { loadUser, type StoredUser } from "@/lib/session";
 
@@ -32,6 +33,7 @@ export default function DashboardPage() {
           <JournalPicker />
         </div>
 
+        <InstallPrompt />
         <BottomNav />
       </div>
     </main>
