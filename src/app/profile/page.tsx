@@ -6,13 +6,9 @@ import {
   Trash2, Phone, LogOut, Loader2, X, Mic, FileText, ShieldCheck,
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
-import { TalaInsightDialog } from "@/components/tala-insight-card";
 import { AiInsightCard } from "@/components/ai-insight-card";
 import { loadUser, clearUser, type StoredUser } from "@/lib/session";
 import { getGreeting } from "@/lib/greeting";
-import { detectTalaInsight } from "@/lib/profile/tala-insight";
-
-const TALA_INSIGHT_DISMISS_KEY = "tala-insight-dismissed";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -304,8 +300,6 @@ export default function ProfilePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackItem>>({});
-  const [insightDismissed, setInsightDismissed] = useState(false);
-  const [insightOpen, setInsightOpen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -314,24 +308,6 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
     setUser(stored);
   }, [router]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate dismissal flag on mount
-    setInsightDismissed(
-      typeof window !== "undefined" &&
-        window.sessionStorage.getItem(TALA_INSIGHT_DISMISS_KEY) === "1",
-    );
-  }, []);
-
-  const handleInsightOpenChange = (next: boolean) => {
-    setInsightOpen(next);
-    if (!next) {
-      setInsightDismissed(true);
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(TALA_INSIGHT_DISMISS_KEY, "1");
-      }
-    }
-  };
 
   const fetchEntries = useCallback(async (userId: number) => {
     setLoading(true);
@@ -375,14 +351,6 @@ export default function ProfilePage() {
     void fetchFeedback(stored.id);
   }, [fetchEntries, fetchFeedback]);
 
-  useEffect(() => {
-    if (loading || fetchError || insightDismissed) return;
-    const detected = detectTalaInsight(entries);
-    if (!detected) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-open once entries load and a pattern is present
-    setInsightOpen(true);
-  }, [loading, fetchError, insightDismissed, entries]);
-
   /* Pagination */
   const totalPages = Math.ceil(entries.length / ENTRIES_PER_PAGE);
   const pageEntries = entries.slice(page * ENTRIES_PER_PAGE, page * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE);
@@ -419,26 +387,6 @@ export default function ProfilePage() {
 
   const initials = getInitials(user.name);
   const greeting = getGreeting(new Date());
-
-  const insight =
-    !loading && !fetchError && !insightDismissed
-      ? detectTalaInsight(entries)
-      : null;
-
-  const insightChips = insight
-    ? insight.contributingEntries
-        .map((c) => {
-          const full = entries.find((e) => e.id === c.id);
-          if (!full) return null;
-          return {
-            id: full.id,
-            date: full.date,
-            mood: full.mood,
-            moodLabel: MOOD_LABEL[full.mood],
-          };
-        })
-        .filter((c): c is NonNullable<typeof c> => c !== null)
-    : [];
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
@@ -713,14 +661,6 @@ export default function ProfilePage() {
           />
         )}
 
-        <TalaInsightDialog
-          open={insightOpen}
-          onOpenChange={handleInsightOpenChange}
-          insight={insight}
-          chipEntries={insightChips}
-          hotlineGroups={HOTLINE_GROUPS}
-          container={frameRef}
-        />
       </div>
     </main>
   );
