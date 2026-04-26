@@ -55,14 +55,14 @@ describe("GUIDED_METHODS registry", () => {
     expect(GUIDED_METHODS).toHaveLength(4);
   });
 
-  it("marks 1-1-1 as ready with three prompts", () => {
-    const m = GUIDED_METHODS.find((x) => x.key === "one-one-one");
-    expect(m?.status).toBe("ready");
-    expect(m?.prompts).toHaveLength(3);
+  it("gives every method a non-empty prompt list", () => {
+    for (const m of GUIDED_METHODS) {
+      expect(m.prompts.length).toBeGreaterThan(0);
+    }
   });
 
-  it("marks all other methods as coming-soon", () => {
-    const others = GUIDED_METHODS.filter((x) => x.key !== "one-one-one");
-    expect(others.every((m) => m.status === "coming-soon")).toBe(true);
+  it("gives 1-1-1 exactly three prompts", () => {
+    const m = GUIDED_METHODS.find((x) => x.key === "one-one-one");
+    expect(m?.prompts).toHaveLength(3);
   });
 });
