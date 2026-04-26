@@ -34,7 +34,7 @@ function stitchTranscript(turns: TurnsRecord["turns"]): string {
   return turns
     .map((t) =>
       t.role === "ai"
-        ? `[Companion] ${t.text.trim()}`
+        ? `[Tala] ${t.text.trim()}`
         : t.text.trim(),
     )
     .filter((line) => line.length > 0)

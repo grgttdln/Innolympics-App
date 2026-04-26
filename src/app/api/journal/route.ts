@@ -1,6 +1,9 @@
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { db } from "@/lib/db";
+import { journalEntries } from "@/lib/db/schema";
 import { requireUser } from "@/lib/api/require-user";
 import { runJournalGraph } from "@/lib/agents/graph";
 import { scanForCrisis } from "@/lib/safety/crisis-scanner";
@@ -9,6 +12,43 @@ import type { JournalApiResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request): Promise<Response> {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const { searchParams } = new URL(request.url);
+  const limit = Math.min(Number(searchParams.get("limit") ?? 50), 100);
+  const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
+
+  const rows = await db
+    .select({
+      id: journalEntries.id,
+      transcript: journalEntries.transcript,
+      aiResponse: journalEntries.aiResponse,
+      intent: journalEntries.intent,
+      severity: journalEntries.severity,
+      moodScore: journalEntries.moodScore,
+      emotions: journalEntries.emotions,
+      flagged: journalEntries.flagged,
+      inputType: journalEntries.inputType,
+      createdAt: journalEntries.createdAt,
+    })
+    .from(journalEntries)
+    .where(
+      and(
+        eq(journalEntries.userId, auth.userId),
+        // exclude placeholder mood-only rows inserted by log-mood
+        // (they use the sentinel transcript value)
+        // We keep all real entries regardless of inputType
+      ),
+    )
+    .orderBy(desc(journalEntries.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return NextResponse.json({ entries: rows });
+}
 
 const BodySchema = z.object({
   transcript: z.string().min(1).max(10_000),
