@@ -7,7 +7,7 @@ export type SuggestResult =
   | { kind: "skip" }
   | { kind: "blocked" };
 
-const MODEL = "gemini-3.1-flash-lite-preview";
+const MODEL = "gemini-2.5-flash-lite";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `You are a gentle journaling companion. You offer ONE short, grounded question when the user pauses writing.

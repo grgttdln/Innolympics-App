@@ -1,11 +1,10 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 /**
- * All LangGraph nodes use the same Gemini model. The repo is already on
- * 3.1-flash-lite-preview for follow-up suggestions, so we stay on it for
- * consistency and cost.
+ * GA lite model — the 3.1 preview model is unreliable (frequent 503
+ * UNAVAILABLE during high demand).
  */
-const MODEL = "gemini-3.1-flash-lite-preview";
+const MODEL = "gemini-2.5-flash-lite";
 
 /**
  * Factory for a configured chat model. Each node constructs its own
